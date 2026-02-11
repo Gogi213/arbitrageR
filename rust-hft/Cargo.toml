@@ -116,3 +116,7 @@ harness = false
 [[bench]]
 name = "parsing"
 harness = false
+
+[[bench]]
+name = "calculator"
+harness = false

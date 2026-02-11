@@ -7,4 +7,7 @@
 //! - Order execution logic
 
 pub mod routing;
-pub mod spread;
+pub mod calculator;
+
+pub use routing::MessageRouter;
+pub use calculator::{SpreadCalculator, SpreadEvent};
