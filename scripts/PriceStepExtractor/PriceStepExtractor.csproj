@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SpreadAggregator.Application\SpreadAggregator.Application.csproj" />
+    <ProjectReference Include="..\..\src\SpreadAggregator.Infrastructure\SpreadAggregator.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\SpreadAggregator.Domain\SpreadAggregator.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

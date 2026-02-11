@@ -1,0 +1,110 @@
+[package]
+name = "rust-hft"
+version = "0.1.0"
+edition = "2021"
+authors = ["HFT Team"]
+description = "Ultra-low latency arbitrage bot for Binance and Bybit"
+license = "MIT"
+repository = "https://github.com/yourusername/rust-hft"
+
+[dependencies]
+# Async runtime - multi-threaded with sync primitives
+tokio = { version = "1.43", features = ["rt-multi-thread", "sync", "time", "net", "macros", "parking_lot"] }
+
+# WebSocket client with rustls (no OpenSSL)
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-native-roots", "connect"], default-features = false }
+
+# Async utilities
+futures-util = { version = "0.3", default-features = false }
+
+# HTTP client - hyper-based with rustls
+reqwest = { version = "0.12", features = ["rustls-tls", "http2", "json"], default-features = false }
+
+# Zero-copy JSON parsing
+simd-json = { version = "0.14", features = ["swar-number-parsing"] }
+
+# Fixed-point decimal for cold path only
+rust_decimal = { version = "1.36", features = ["maths"], default-features = false }
+
+# Time handling
+time = { version = "=0.3.36", features = ["formatting", "parsing", "macros"], default-features = false }
+
+# HMAC-SHA256 for API signing
+hmac = "0.12"
+sha2 = "0.10"
+hex = { version = "0.4", default-features = false }
+
+# Lock-free data structures
+crossbeam = "0.8"
+crossbeam-queue = "0.3"
+crossbeam-utils = "0.8"
+
+# Atomic operations and concurrency
+parking_lot = "0.12"
+
+# Error handling - minimal overhead
+thiserror = "1.0"
+anyhow = { version = "1.0", default-features = false }
+
+# Configuration
+serde = { version = "1.0", features = ["derive"], default-features = false }
+serde_json = { version = "1.0", default-features = false }
+toml = "0.8"
+
+# Logging - only for cold path
+tracing = { version = "0.1", default-features = false }
+tracing-subscriber = { version = "0.3", features = ["fmt", "json", "env-filter", "std"], default-features = false }
+
+# Bytes handling - zero-copy
+bytes = { version = "1.10", default-features = false }
+
+# URL parsing
+url = { version = "2.5", default-features = false }
+
+# UUID generation
+uuid = { version = "1.13", features = ["v4"], default-features = false }
+
+# Bit manipulation for symbol interning
+bitvec = { version = "1.0", default-features = false }
+
+[dev-dependencies]
+# Testing
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.6"
+
+[profile.release]
+# Maximum optimization
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# Link-time optimization for single binary
+[profile.release-lto]
+inherits = "release"
+lto = true
+
+# Profile for benchmarks (no LTO for faster compile)
+[profile.bench]
+inherits = "release"
+lto = false
+codegen-units = 16
+
+# Profile for development with some optimizations
+[profile.dev-opt]
+inherits = "dev"
+opt-level = 2
+
+[[bin]]
+name = "rust-hft"
+path = "src/main.rs"
+
+[[bench]]
+name = "fixed_point"
+harness = false
+
+[[bench]]
+name = "websocket"
+harness = false

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBERPUNK TRADER v2.0</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/cyberpunk.css">
+    
+    <!-- Vue 3 Import Map (No Build Step) -->
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+        }
+      }
+    </script>
+</head>
+<body>
+    
+    <div id="loader" class="loader-overlay">
+        <div style="color:var(--neon-blue); font-size:24px; font-weight:800; animation: pulse 1s infinite;">LOADING SYSTEM...</div>
+    </div>
+
+    <div id="app" class="app-container" v-cloak 
+         :style="{ gridTemplateColumns: (currentTab === 'grid' && store.selectedBot) ? '280px 1fr 350px' : '280px 1fr 0px' }">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div style="display:flex; align-items:center; gap:30px;">
+                <div class="brand">⚡ SPREAD AGGREGATOR <span style="font-weight:400; font-size:12px; opacity:0.7;">PRO MAX</span></div>
+                
+                <!-- Navigation Tabs -->
+                <nav class="nav-tabs">
+                    <button class="nav-btn" :class="{ active: currentTab === 'grid' }" @click="currentTab = 'grid'">ACTIVE BOTS</button>
+                    <button class="nav-btn" :class="{ active: currentTab === 'dashboard' }" @click="currentTab = 'dashboard'">DASHBOARD</button>
+                    <button class="nav-btn" :class="{ active: currentTab === 'table' }" @click="currentTab = 'table'">STATISTICS</button>
+                    <button class="nav-btn" :class="{ active: currentTab === 'ladders' }" @click="currentTab = 'ladders'">LIVE LADDERS</button>
+                    <button class="nav-btn" :class="{ active: currentTab === 'debug' }" @click="currentTab = 'debug'">DEBUG</button>
+                </nav>
+            </div>
+            
+            <div style="font-size:12px; color:var(--text-secondary);">
+                SYS: <span :class="store.system.isConnected ? 'text-green' : 'text-red'">{{ store.system.isConnected ? 'ONLINE' : 'OFFLINE' }}</span>
+                <span style="margin-left:12px;">LAT: {{ store.system.latencyMs }}ms</span>
+            </div>
+        </header>
+
+        <!-- VIEW: GRID (Default 3-Pane) -->
+        <div v-if="currentTab === 'grid'" style="display:contents;">
+            <!-- Left Pane: Global -->
+            <aside class="pane pane-left">
+                <div style="margin-bottom:24px;">
+                    <h3 style="color:var(--text-secondary); font-size:12px; text-transform:uppercase;">Portfolio</h3>
+                    <div style="font-size:32px; font-weight:800;" :class="store.totalPnL >= 0 ? 'text-green' : 'text-red'">
+                        {{ fmtMoney(store.totalPnL) }}
+                    </div>
+                    <div style="font-size:12px; color:var(--text-secondary);">
+                        Unrealized: <span :class="store.totalUnrealizedPnL >= 0 ? 'text-green' : 'text-red'">{{ fmtMoney(store.totalUnrealizedPnL) }}</span>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:24px;">
+                    <h3 style="color:var(--text-secondary); font-size:12px; text-transform:uppercase;">Control</h3>
+                    <div style="display:flex; gap:8px;">
+                        <input v-model="newBotSymbol" 
+                               @keyup.enter="spawn" 
+                               @input="onSymbolInput"
+                               placeholder="SYMBOL" 
+                               style="background:#222; border:1px solid #444; color:#fff; padding:6px; width:100px; text-transform:uppercase;">
+                        
+                        <button class="btn btn-primary" @click="spawn">+ BOT</button>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-dim); margin-top:4px;">
+                        Type e.g. "BTCUSDT" & press Enter
+                    </div>
+                </div>
+                
+                <div>
+                     <h3 style="color:var(--text-secondary); font-size:12px; text-transform:uppercase;">Active Bots ({{ store.activeBotCount }})</h3>
+                     <div style="margin-top:12px; display:flex; flex-direction:column; gap:4px;">
+                         <div v-for="bot in sortedBots" 
+                              class="metric-row" 
+                              style="cursor:pointer; padding:4px 8px; border-radius:3px; margin:0;"
+                              :style="{ background: store.selectedBotSymbol === bot.tracker?.symbol ? 'rgba(255,255,255,0.05)' : 'transparent' }"
+                              @click="store.selectBot(bot.tracker.symbol)">
+                             <span :class="bot.tracker?.isTradingEnabled ? 'text-green' : 'text-dim'">● {{ bot.tracker?.symbol }}</span>
+                             <span :class="(bot.pnl || 0) >= 0 ? 'text-green' : 'text-red'">{{ fmtMoney(bot.pnl) }}</span>
+                         </div>
+                     </div>
+                </div>
+            </aside>
+
+            <!-- Center Pane: The Grid -->
+            <main class="pane pane-center">
+                
+                <!-- Empty State -->
+                <div v-if="store.bots.length === 0" style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#444;">
+                    <div style="font-size:64px; margin-bottom:20px; opacity:0.2;">🚀</div>
+                    <h2 style="color:var(--text-secondary); margin-top:0;">SYSTEM READY</h2>
+                    <p>No active trading bots.</p>
+                    <div style="display:flex; gap:8px; margin-top:20px;">
+                        <button class="btn" @click="quickSpawn('BTCUSDT')">Spawn BTCUSDT</button>
+                        <button class="btn" @click="quickSpawn('ETHUSDT')">Spawn ETHUSDT</button>
+                        <button class="btn" @click="quickSpawn('SOLUSDT')">Spawn SOLUSDT</button>
+                    </div>
+                </div>
+                
+                <!-- Grid -->
+                <div v-else>
+                    <h3 style="color:var(--text-secondary); font-size:12px; text-transform:uppercase; margin-bottom:16px;">Grid View</h3>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:16px;">
+                        <bot-card 
+                            v-for="bot in sortedBots" 
+                            :key="bot.tracker?.symbol" 
+                            :bot="bot"
+                            :class="{ 'selected': store.selectedBotSymbol === bot.tracker?.symbol }"
+                            @select="store.selectBot"
+                            @toggle="store.toggleBot"
+                            @delete="store.deleteBot">
+                        </bot-card>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Pane: Inspector -->
+            <aside class="pane pane-right" v-show="store.selectedBot">
+                <div v-if="store.selectedBot">
+                    <h2 style="border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:12px; margin-top:0;">
+                        <button class="btn btn-ghost" @click="store.selectBot(null)" style="float:right;">✕</button>
+                        {{ store.selectedBot.tracker?.symbol }}
+                    </h2>
+                    
+                    <div style="background:rgba(0,0,0,0.3); padding:12px; border-radius:4px; margin-bottom:20px;">
+                        <div style="font-size:10px; color:#888; text-transform:uppercase;">Status</div>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button class="btn btn-primary" v-if="!store.selectedBot.tracker?.isTradingEnabled" @click="store.toggleBot(store.selectedBot.tracker.symbol, 'start')">▶ START</button>
+                            <button class="btn btn-danger" v-else @click="store.toggleBot(store.selectedBot.tracker.symbol, 'stop')">⏹ STOP</button>
+                            
+                             <button class="btn btn-ghost" 
+                                     v-if="!store.selectedBot.tracker?.isTradingEnabled" 
+                                     @click="store.deleteBot(store.selectedBot.tracker.symbol)"
+                                     title="Requires: Stopped + Flat + No Orders">
+                                 🗑 DELETE
+                             </button>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Half-Life</span>
+                        <span class="metric-val text-blue">{{ store.selectedBot.tracker?.halfLifeSec?.toFixed(1) }}s</span>
+                    </div>
+                    
+                     <div class="metric-row">
+                        <span class="metric-label">Structural Break?</span>
+                        <span class="metric-val" :class="store.selectedBot.tracker?.halfLifeSec > 300 ? 'text-red' : 'text-green'">
+                            {{ store.selectedBot.tracker?.halfLifeSec > 300 ? 'YES' : 'NO' }}
+                        </span>
+                    </div>
+                    
+                    <ladder :bot="store.selectedBot"></ladder>
+
+                </div>
+            </aside>
+        </div>
+        
+        <!-- VIEW: DASHBOARD (Overview) -->
+        <div v-if="currentTab === 'dashboard'" style="grid-column: 1 / -1; padding: 0; overflow: hidden;">
+            <system-dashboard :store="store"></system-dashboard>
+        </div>
+
+        <!-- VIEW: STATISTICS TABLE -->
+        <div v-if="currentTab === 'table'" style="grid-column: 1 / -1; padding: 20px; overflow: hidden;">
+            <stats-table :bots="store.bots"></stats-table>
+        </div>
+        
+        <!-- VIEW: LIVE LADDERS -->
+        <div v-if="currentTab === 'ladders'" style="grid-column: 1 / -1; padding: 0; overflow: hidden;">
+            <ladder-grid :bots="store.bots"></ladder-grid>
+        </div>
+
+        <!-- VIEW: DEBUG CONSOLE -->
+        <div v-if="currentTab === 'debug'" style="grid-column: 1 / -1; padding: 0; overflow: hidden;">
+            <debug-console :logs="store.logs"></debug-console>
+        </div>
+
+    </div>
+
+    <!-- App Logic -->
+    <script type="module" src="js/app-vue.js"></script>
+</body>
+</html>

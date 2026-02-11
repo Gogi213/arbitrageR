@@ -1,0 +1,101 @@
+# Tick Size Blacklist (Impact >= 0,05%)
+# Сгенерировано: 2026-01-04 22:07:25
+# Всего монет: 85
+
+# Binance (45 монет):
+
+FLOW_USDT  # Impact: 1,0753%, Price: $0,0930, TickStep: 0,001
+CELO_USDT  # Impact: 0,7634%, Price: $0,1310, TickStep: 0,001
+1000SATS_USDT  # Impact: 0,5348%, Price: $0,0000, TickStep: 0,0000001
+DYDX_USDT  # Impact: 0,4975%, Price: $0,2010, TickStep: 0,001
+CRV_USDT  # Impact: 0,2342%, Price: $0,4270, TickStep: 0,001
+SNX_USDT  # Impact: 0,2123%, Price: $0,4710, TickStep: 0,001
+DOGS_USDT  # Impact: 0,1953%, Price: $0,0001, TickStep: 0,0000001
+XTZ_USDT  # Impact: 0,1815%, Price: $0,5510, TickStep: 0,001
+ONT_USDT  # Impact: 0,1570%, Price: $0,0637, TickStep: 0,0001
+US_USDT  # Impact: 0,1536%, Price: $0,0065, TickStep: 0,0000100
+GALA_USDT  # Impact: 0,1319%, Price: $0,0076, TickStep: 0,00001
+STRK_USDT  # Impact: 0,1095%, Price: $0,0913, TickStep: 0,0001000
+AXS_USDT  # Impact: 0,1027%, Price: $0,9740, TickStep: 0,00100
+MAGIC_USDT  # Impact: 0,0988%, Price: $0,1012, TickStep: 0,000100
+IOTA_USDT  # Impact: 0,0971%, Price: $0,1030, TickStep: 0,0001
+ATH_USDT  # Impact: 0,0952%, Price: $0,0105, TickStep: 0,0000100
+POPCAT_USDT  # Impact: 0,0912%, Price: $0,1097, TickStep: 0,0001000
+MEW_USDT  # Impact: 0,0880%, Price: $0,0011, TickStep: 0,0000010
+PEOPLE_USDT  # Impact: 0,0839%, Price: $0,0119, TickStep: 0,00001
+ALLO_USDT  # Impact: 0,0811%, Price: $0,1233, TickStep: 0,0001000
+SEI_USDT  # Impact: 0,0793%, Price: $0,1261, TickStep: 0,0001000
+ROSE_USDT  # Impact: 0,0776%, Price: $0,0129, TickStep: 0,00001
+MEME_USDT  # Impact: 0,0772%, Price: $0,0013, TickStep: 0,0000010
+STORJ_USDT  # Impact: 0,0756%, Price: $0,1322, TickStep: 0,0001
+MELANIA_USDT  # Impact: 0,0744%, Price: $0,1344, TickStep: 0,000100
+ALGO_USDT  # Impact: 0,0728%, Price: $0,1374, TickStep: 0,0001
+MANA_USDT  # Impact: 0,0714%, Price: $0,1401, TickStep: 0,0001
+ZBT_USDT  # Impact: 0,0699%, Price: $0,1431, TickStep: 0,0001000
+GUN_USDT  # Impact: 0,0698%, Price: $0,0143, TickStep: 0,0000100
+ZRX_USDT  # Impact: 0,0669%, Price: $0,1495, TickStep: 0,0001
+FIL_USDT  # Impact: 0,0665%, Price: $1,5030, TickStep: 0,001
+NEIRO_USDT  # Impact: 0,0650%, Price: $0,0002, TickStep: 0,00000010
+DEGEN_USDT  # Impact: 0,0637%, Price: $0,0016, TickStep: 0,0000010
+A2Z_USDT  # Impact: 0,0602%, Price: $0,0017, TickStep: 0,0000010
+SWARMS_USDT  # Impact: 0,0595%, Price: $0,0168, TickStep: 0,0000100
+WLFI_USDT  # Impact: 0,0586%, Price: $0,1706, TickStep: 0,0001000
+NEAR_USDT  # Impact: 0,0575%, Price: $1,7380, TickStep: 0,0010
+TRADOOR_USDT  # Impact: 0,0561%, Price: $1,7820, TickStep: 0,0010000
+IO_USDT  # Impact: 0,0556%, Price: $0,1798, TickStep: 0,0001000
+TST_USDT  # Impact: 0,0549%, Price: $0,0182, TickStep: 0,0000100
+BDXN_USDT  # Impact: 0,0549%, Price: $0,0182, TickStep: 0,0000100
+HEMI_USDT  # Impact: 0,0534%, Price: $0,0187, TickStep: 0,0000100
+TUT_USDT  # Impact: 0,0517%, Price: $0,0194, TickStep: 0,0000100
+RENDER_USDT  # Impact: 0,0507%, Price: $1,9720, TickStep: 0,0010000
+XPL_USDT  # Impact: 0,0504%, Price: $0,1983, TickStep: 0,0001000
+
+# Bybit (1 монет):
+
+APT_USDT  # Impact: 0,0514%, Price: $1,9470, TickStep: 0,0010
+
+# GateFutures (5 монет):
+
+FLOW_USDT  # Impact: 0,1002%, Price: $0,0998, TickStep: 0,0001
+AVAX_USDT  # Impact: 0,0706%, Price: $14,1700, TickStep: 0,01
+FIL_USDT  # Impact: 0,0665%, Price: $1,5030, TickStep: 0,001
+WLFI_USDT  # Impact: 0,0586%, Price: $0,1706, TickStep: 0,0001
+XPL_USDT  # Impact: 0,0505%, Price: $0,1982, TickStep: 0,0001
+
+# OKX (34 монет):
+
+FLOW_USDT  # Impact: 0,0966%, Price: $0,1035, TickStep: 0,0001
+TRUST_USDT  # Impact: 0,0855%, Price: $0,1170, TickStep: 0,0001
+POL_USDT  # Impact: 0,0816%, Price: $0,1226, TickStep: 0,0001
+ALLO_USDT  # Impact: 0,0810%, Price: $0,1234, TickStep: 0,0001
+SAND_USDT  # Impact: 0,0805%, Price: $0,1242, TickStep: 0,0001
+SEI_USDT  # Impact: 0,0794%, Price: $0,1259, TickStep: 0,0001
+2Z_USDT  # Impact: 0,0778%, Price: $0,1286, TickStep: 0,0001
+CORE_USDT  # Impact: 0,0770%, Price: $0,1299, TickStep: 0,0001
+CELO_USDT  # Impact: 0,0765%, Price: $0,1308, TickStep: 0,0001
+SOPH_USDT  # Impact: 0,0732%, Price: $0,0137, TickStep: 0,00001
+ALGO_USDT  # Impact: 0,0728%, Price: $0,1374, TickStep: 0,0001
+MANA_USDT  # Impact: 0,0713%, Price: $0,1403, TickStep: 0,0001
+ZRX_USDT  # Impact: 0,0667%, Price: $0,1499, TickStep: 0,0001
+FIL_USDT  # Impact: 0,0665%, Price: $1,5040, TickStep: 0,001
+NEIRO_USDT  # Impact: 0,0650%, Price: $0,0002, TickStep: 0,0000001
+1INCH_USDT  # Impact: 0,0626%, Price: $0,1597, TickStep: 0,0001
+GMT_USDT  # Impact: 0,0611%, Price: $0,0164, TickStep: 0,00001
+SAPIEN_USDT  # Impact: 0,0598%, Price: $0,1672, TickStep: 0,0001
+STABLE_USDT  # Impact: 0,0594%, Price: $0,0168, TickStep: 0,00001
+WLFI_USDT  # Impact: 0,0587%, Price: $0,1705, TickStep: 0,0001
+NEAR_USDT  # Impact: 0,0575%, Price: $1,7380, TickStep: 0,001
+A_USDT  # Impact: 0,0561%, Price: $0,1782, TickStep: 0,0001
+XAN_USDT  # Impact: 0,0556%, Price: $0,0180, TickStep: 0,00001
+BABY_USDT  # Impact: 0,0555%, Price: $0,0180, TickStep: 0,00001
+LAYER_USDT  # Impact: 0,0549%, Price: $0,1821, TickStep: 0,0001
+PLUME_USDT  # Impact: 0,0546%, Price: $0,0183, TickStep: 0,00001
+WET_USDT  # Impact: 0,0541%, Price: $0,1850, TickStep: 0,0001
+IOST_USDT  # Impact: 0,0537%, Price: $0,0019, TickStep: 0,000001
+SATS_USDT  # Impact: 0,0536%, Price: $0,0000, TickStep: 0,00000000001
+OL_USDT  # Impact: 0,0534%, Price: $0,0187, TickStep: 0,00001
+TON_USDT  # Impact: 0,0532%, Price: $1,8780, TickStep: 0,001
+APT_USDT  # Impact: 0,0514%, Price: $1,9470, TickStep: 0,001
+RENDER_USDT  # Impact: 0,0508%, Price: $1,9680, TickStep: 0,001
+XPL_USDT  # Impact: 0,0505%, Price: $0,1981, TickStep: 0,0001
+

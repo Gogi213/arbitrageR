@@ -1,0 +1,54 @@
+# Rust
+rust-hft/target
+rust-hft/Cargo.lock
+**/*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+/logs
+*.log
+
+# Data files
+/data
+*.db
+*.sqlite
+*.parquet
+
+# Config with secrets
+config/secrets.toml
+config/*.key
+config/*.pem
+
+# Build artifacts
+/dist
+/build
+/out
+
+# Test artifacts
+*.profraw
+*.profdata
+
+# Benchmark results
+/benches/results
+*.html
+
+# Temporary files
+/tmp
+.temp
+.cache
+
+# OS
+Thumbs.db
+.DS_Store
