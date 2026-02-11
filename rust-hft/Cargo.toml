@@ -97,6 +97,10 @@ codegen-units = 16
 inherits = "dev"
 opt-level = 2
 
+[lib]
+name = "rust_hft"
+path = "src/lib.rs"
+
 [[bin]]
 name = "rust-hft"
 path = "src/main.rs"
@@ -107,4 +111,8 @@ harness = false
 
 [[bench]]
 name = "websocket"
+harness = false
+
+[[bench]]
+name = "parsing"
 harness = false

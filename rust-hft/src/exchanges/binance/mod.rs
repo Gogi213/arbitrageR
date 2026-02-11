@@ -7,6 +7,7 @@ use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData};
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
+use crate::exchanges::parsing::{BinanceParser, BinanceMessageType};
 use crate::HftError;
 
 use std::time::Duration;
@@ -142,17 +143,32 @@ impl BinanceWsClient {
     /// Parse Binance message into structured data
     fn parse_message(
         &mut self,
-        _text: &str,
+        text: &str,
     ) -> Result<Option<BinanceMessage>, HftError> {
-        // TODO: Implement zero-copy parsing in Phase 3.3
-        // For now, return None - parsing will be implemented with benchmarks
-        Ok(None)
-    }
-
-    /// Parse aggTrade message
-    fn parse_agg_trade(&self, _value: &simd_json::OwnedValue) -> Option<TradeData> {
-        // TODO: Implement in Phase 3.3 with zero-copy parsing
-        None
+        let data = text.as_bytes();
+        
+        // Detect message type and parse accordingly
+        match BinanceParser::detect_message_type(data) {
+            BinanceMessageType::AggTrade => {
+                match BinanceParser::parse_trade(data) {
+                    Some(result) => Ok(Some(BinanceMessage::Trade(result.data))),
+                    None => Ok(None),
+                }
+            }
+            BinanceMessageType::BookTicker => {
+                match BinanceParser::parse_ticker(data) {
+                    Some(result) => Ok(Some(BinanceMessage::Ticker(result.data))),
+                    None => Ok(None),
+                }
+            }
+            BinanceMessageType::SubscriptionResponse => {
+                Ok(Some(BinanceMessage::SubscriptionConfirmed))
+            }
+            BinanceMessageType::Unknown => {
+                // Unknown message type, could be heartbeat or error
+                Ok(None)
+            }
+        }
     }
 
     /// Check if connected

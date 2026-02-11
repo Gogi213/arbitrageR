@@ -2,9 +2,11 @@
 
 pub mod binance;
 pub mod bybit;
+pub mod parsing;
 
-pub use binance::BinanceWsClient;
-pub use bybit::BybitWsClient;
+pub use binance::{BinanceWsClient, BinanceMessage};
+pub use bybit::{BybitWsClient, BybitMessage, OrderBookData};
+pub use parsing::{BinanceParser, BybitParser};
 
 /// Exchange identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -11,37 +11,9 @@
 #![feature(portable_simd)]
 #![allow(incomplete_features)]
 
-pub mod core;
-pub mod exchanges;
-pub mod hot_path;
-pub mod infrastructure;
-pub mod rest;
-pub mod ws;
-
+use rust_hft::{HftError, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-/// Main error type for the HFT bot
-#[derive(thiserror::Error, Debug)]
-pub enum HftError {
-    #[error("WebSocket error: {0}")]
-    WebSocket(String),
-    
-    #[error("REST API error: {0}")]
-    RestApi(String),
-    
-    #[error("Parse error: {0}")]
-    Parse(String),
-    
-    #[error("Configuration error: {0}")]
-    Config(String),
-    
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
-
-/// Result type alias
-pub type Result<T> = std::result::Result<T, HftError>;
 
 /// Main application state
 pub struct HftApp {

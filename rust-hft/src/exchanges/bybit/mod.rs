@@ -7,6 +7,7 @@ use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData};
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
+use crate::exchanges::parsing::{BybitParser, BybitMessageType};
 use crate::HftError;
 use std::time::Duration;
 use tokio::time::{interval, Instant};
@@ -204,10 +205,33 @@ impl BybitWsClient {
 
     /// Parse Bybit V5 message
     fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>, HftError> {
-        // TODO: Implement zero-copy parsing in Phase 3.3
-        // Bybit V5 format is different from Binance
-        // For now, return None - parsing will be implemented with benchmarks
-        Ok(None)
+        let data = text.as_bytes();
+
+        // Detect message type and parse accordingly
+        match BybitParser::detect_message_type(data) {
+            BybitMessageType::PublicTrade => {
+                match BybitParser::parse_public_trade(data) {
+                    Some(result) => Ok(Some(BybitMessage::Trade(result.data))),
+                    None => Ok(None),
+                }
+            }
+            BybitMessageType::Ticker => {
+                match BybitParser::parse_ticker(data) {
+                    Some(result) => Ok(Some(BybitMessage::Ticker(result.data))),
+                    None => Ok(None),
+                }
+            }
+            BybitMessageType::Pong => {
+                Ok(Some(BybitMessage::Pong))
+            }
+            BybitMessageType::SubscriptionResponse => {
+                Ok(Some(BybitMessage::SubscriptionSuccess))
+            }
+            BybitMessageType::Unknown => {
+                // Unknown message type
+                Ok(None)
+            }
+        }
     }
 
     /// Check if connected
