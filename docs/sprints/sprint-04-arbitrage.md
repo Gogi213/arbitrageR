@@ -22,14 +22,15 @@
 - [x] Benchmark target: <50ns per calculation (Actual: ~38ns)
 
 ### Phase 4.2: Threshold Tracker (Warm Path)
+**Status**: COMPLETE ✅
 **Objective**: Aggregate spread statistics for the Screener.
-- [ ] Implement `ThresholdTracker` to store symbol state
-- [ ] Metrics:
+- [x] Implement `ThresholdTracker` to store symbol state
+- [x] Metrics:
     - `CurrentSpread`: Latest calculated spread
     - `SpreadRange`: `Max - Min` over rolling window (2 mins)
-    - `Hits`: Count of opportunities > threshold (e.g. 0.1%)
-    - `HalfLife`: (Optional) Mean reversion speed
-- [ ] Ring Buffer implementation for rolling stats (no allocations)
+    - `Hits`: Count of opportunities > threshold
+- [x] Ring Buffer implementation for rolling stats
+- [x] Benchmark: ~62ns per update (Target <100ns)
 
 ### Phase 4.3: API Server (Cold Path)
 **Objective**: Serve data to `dashboard.html`.
