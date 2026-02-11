@@ -12,6 +12,8 @@ pub mod logging;
 pub mod metrics;
 pub mod pool;
 pub mod ring_buffer;
+pub mod api;
 
 pub use pool::{ObjectPool, ByteBufferPool, MessageBufferPool};
 pub use ring_buffer::RingBuffer;
+pub use api::start_server;

@@ -6,11 +6,13 @@
 //! - **exchanges**: Exchange-specific implementations
 //! - **ws**: WebSocket clients
 //! - **rest**: REST API clients
-//! - **infrastructure**: Cold path (logging, metrics, config)
+//! - **infrastructure**: Cold path (logging, metrics, config, api)
 
 #![feature(portable_simd)]
 #![allow(incomplete_features)]
 
+use rust_hft::hot_path::ThresholdTracker;
+use rust_hft::infrastructure::start_server;
 use rust_hft::{HftError, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -24,11 +26,7 @@ pub struct HftApp {
 /// Application configuration
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub binance_api_key: String,
-    pub binance_api_secret: String,
-    pub bybit_api_key: String,
-    pub bybit_api_secret: String,
-    pub use_testnet: bool,
+    pub api_port: u16,
 }
 
 impl HftApp {
@@ -41,8 +39,31 @@ impl HftApp {
     
     /// Run the main event loop
     pub async fn run(&self) -> Result<()> {
-        // TODO: Implement in later phases
-        Ok(())
+        tracing::info!("Starting HFT Arbitrage Bot...");
+        
+        // 1. Initialize Core Components
+        let tracker = Arc::new(RwLock::new(ThresholdTracker::new()));
+        
+        // 2. Start API Server (Cold Path)
+        let tracker_for_api = tracker.clone();
+        let config = self.config.read().await;
+        let port = config.api_port;
+        
+        tokio::spawn(async move {
+            if let Err(e) = start_server(tracker_for_api, port).await {
+                tracing::error!("API Server failed: {}", e);
+            }
+        });
+        
+        // 3. TODO: Start WebSocket Clients (Hot Path)
+        // This will be implemented in Phase 4.4 integration
+        
+        tracing::info!("System initialized. Waiting for connections...");
+        
+        // Keep main loop running
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        }
     }
 }
 
@@ -53,11 +74,7 @@ async fn main() -> Result<()> {
     
     // TODO: Load config from file
     let config = Config {
-        binance_api_key: String::new(),
-        binance_api_secret: String::new(),
-        bybit_api_key: String::new(),
-        bybit_api_secret: String::new(),
-        use_testnet: true,
+        api_port: 3000,
     };
     
     let app = HftApp::new(config).await?;
