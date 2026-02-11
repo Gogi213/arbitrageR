@@ -3,10 +3,12 @@
 pub mod binance;
 pub mod bybit;
 pub mod parsing;
+pub mod traits;
 
 pub use binance::{BinanceWsClient, BinanceMessage};
 pub use bybit::{BybitWsClient, BybitMessage, OrderBookData};
 pub use parsing::{BinanceParser, BybitParser};
+pub use traits::{AnyExchange, ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
 
 /// Exchange identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -7,7 +7,7 @@ use super::{FixedPoint8, Symbol};
 
 /// Best bid/ask ticker data
 #[repr(C, align(64))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TickerData {
     /// Trading pair symbol
     pub symbol: Symbol,
@@ -57,7 +57,7 @@ impl Side {
 
 /// Individual trade data (aggTrade)
 #[repr(C, align(64))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TradeData {
     /// Trading pair symbol
     pub symbol: Symbol,

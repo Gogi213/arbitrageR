@@ -8,7 +8,7 @@ use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
 use crate::exchanges::parsing::{BybitParser, BybitMessageType};
-use crate::HftError;
+use crate::{HftError, Result};
 use std::time::Duration;
 use tokio::time::{interval, Instant};
 
@@ -51,7 +51,7 @@ impl BybitWsClient {
     }
 
     /// Connect to Bybit WebSocket
-    pub async fn connect(&mut self, testnet: bool) -> Result<(), HftError> {
+    pub async fn connect(&mut self, testnet: bool) -> Result<()> {
         let url = if testnet { Self::WS_URL_TESTNET } else { Self::WS_URL };
         
         let mut conn = WebSocketConnection::connect(url)
@@ -69,7 +69,7 @@ impl BybitWsClient {
     /// Subscribe to public trade stream for symbols
     /// 
     /// Bybit V5 uses topics: publicTrade.{symbol}
-    pub async fn subscribe_public_trades(&mut self, symbols: &[Symbol]) -> Result<(), HftError> {
+    pub async fn subscribe_public_trades(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
         }
@@ -111,7 +111,7 @@ impl BybitWsClient {
     /// Subscribe to ticker stream for symbols
     /// 
     /// Bybit V5 uses topics: tickers.{symbol}
-    pub async fn subscribe_tickers(&mut self, symbols: &[Symbol]) -> Result<(), HftError> {
+    pub async fn subscribe_tickers(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
         }
@@ -145,7 +145,7 @@ impl BybitWsClient {
     /// Subscribe to orderbook stream for symbols
     /// 
     /// Bybit V5 uses topics: orderbook.1.{symbol} (level 1)
-    pub async fn subscribe_orderbook(&mut self, symbols: &[Symbol]) -> Result<(), HftError> {
+    pub async fn subscribe_orderbook(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
         }
@@ -177,7 +177,7 @@ impl BybitWsClient {
     }
 
     /// Receive and process next message
-    pub async fn recv(&mut self) -> Result<Option<BybitMessage>, HftError> {
+    pub async fn recv(&mut self) -> Result<Option<BybitMessage>> {
         if let Some(conn) = self.connection.as_mut() {
             match conn.recv().await {
                 Ok(Some(msg)) => {
@@ -204,7 +204,7 @@ impl BybitWsClient {
     }
 
     /// Parse Bybit V5 message
-    fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>, HftError> {
+    fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>> {
         let data = text.as_bytes();
 
         // Detect message type and parse accordingly
@@ -252,7 +252,7 @@ impl BybitWsClient {
     }
 
     /// Send ping (Bybit requires explicit ping)
-    pub async fn send_ping(&mut self) -> Result<(), HftError> {
+    pub async fn send_ping(&mut self) -> Result<()> {
         if let Some(conn) = self.connection.as_mut() {
             let ping_msg = serde_json::json!({
                 "op": "ping",
@@ -278,6 +278,70 @@ impl BybitWsClient {
 impl Default for BybitWsClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// === WebSocketExchange Trait Implementation ===
+
+use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
+use crate::exchanges::Exchange;
+
+impl WebSocketExchange for BybitWsClient {
+    #[inline]
+    fn exchange(&self) -> Exchange {
+        Exchange::Bybit
+    }
+
+    async fn connect(&mut self) -> crate::Result<()> {
+        // Use existing connect method (default to mainnet)
+        // If testnet is needed, it should be configured at creation time
+        self.connect(false).await
+    }
+
+    async fn subscribe_trades(&mut self, symbols: &[Symbol]) -> crate::Result<()> {
+        self.subscribe_public_trades(symbols).await
+    }
+
+    async fn subscribe_tickers(&mut self, symbols: &[Symbol]) -> crate::Result<()> {
+        self.subscribe_tickers(symbols).await
+    }
+
+    async fn next_message(&mut self) -> crate::Result<Option<ExchangeMessage>> {
+        match self.recv().await? {
+            Some(BybitMessage::Trade(trade)) => {
+                Ok(Some(ExchangeMessage::Trade(Exchange::Bybit, trade)))
+            }
+            Some(BybitMessage::Ticker(ticker)) => {
+                Ok(Some(ExchangeMessage::Ticker(Exchange::Bybit, ticker)))
+            }
+            Some(BybitMessage::Pong) | Some(BybitMessage::SubscriptionSuccess) => {
+                Ok(Some(ExchangeMessage::Heartbeat))
+            }
+            Some(BybitMessage::OrderBook(_)) => {
+                // Not yet supported in generic ExchangeMessage
+                Ok(None)
+            }
+            Some(BybitMessage::Error(msg)) => {
+                Ok(Some(ExchangeMessage::Error(ExchangeError {
+                    exchange: Exchange::Bybit,
+                    kind: ErrorKind::Unknown,
+                    message: msg,
+                })))
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[inline]
+    fn is_connected(&self) -> bool {
+        self.connection.as_ref()
+            .map(|c| c.is_connected())
+            .unwrap_or(false)
+    }
+
+    #[inline]
+    fn last_activity(&self) -> std::time::Instant {
+        self.last_message.into_std()
     }
 }
 

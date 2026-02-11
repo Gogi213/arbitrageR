@@ -8,7 +8,9 @@ use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
 use crate::exchanges::parsing::{BinanceParser, BinanceMessageType};
-use crate::HftError;
+use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
+use crate::exchanges::Exchange;
+use crate::{HftError, Result};
 
 use std::time::Duration;
 use tokio::time::{interval, Instant};
@@ -40,7 +42,7 @@ impl BinanceWsClient {
     }
 
     /// Connect to Binance WebSocket
-    pub async fn connect(&mut self) -> Result<(), HftError> {
+    pub async fn connect(&mut self) -> Result<()> {
         let mut conn = WebSocketConnection::connect(Self::WS_URL)
             .await
             .map_err(|e| HftError::WebSocket(e.to_string()))?;
@@ -52,7 +54,7 @@ impl BinanceWsClient {
     }
 
     /// Subscribe to aggTrade stream for symbols
-    pub async fn subscribe_agg_trades(&mut self, symbols: &[Symbol]) -> Result<(), HftError> {
+    pub async fn subscribe_agg_trades(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
         }
@@ -84,7 +86,7 @@ impl BinanceWsClient {
     }
 
     /// Subscribe to bookTicker stream for symbols
-    pub async fn subscribe_book_tickers(&mut self, symbols: &[Symbol]) -> Result<(), HftError> {
+    pub async fn subscribe_book_tickers(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
         }
@@ -114,7 +116,7 @@ impl BinanceWsClient {
     }
 
     /// Receive and process next message
-    pub async fn recv(&mut self) -> Result<Option<BinanceMessage>, HftError> {
+    pub async fn recv(&mut self) -> Result<Option<BinanceMessage>> {
         if let Some(conn) = self.connection.as_mut() {
             match conn.recv().await {
                 Ok(Some(msg)) => {
@@ -144,7 +146,7 @@ impl BinanceWsClient {
     fn parse_message(
         &mut self,
         text: &str,
-    ) -> Result<Option<BinanceMessage>, HftError> {
+    ) -> Result<Option<BinanceMessage>> {
         let data = text.as_bytes();
         
         // Detect message type and parse accordingly
@@ -202,6 +204,58 @@ impl BinanceWsClient {
 impl Default for BinanceWsClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// === WebSocketExchange Trait Implementation ===
+
+impl WebSocketExchange for BinanceWsClient {
+    #[inline]
+    fn exchange(&self) -> Exchange {
+        Exchange::Binance
+    }
+
+    async fn connect(&mut self) -> crate::Result<()> {
+        // Use existing connect method
+        self.connect().await
+    }
+
+    async fn subscribe_trades(&mut self, symbols: &[Symbol]) -> crate::Result<()> {
+        self.subscribe_agg_trades(symbols).await
+    }
+
+    async fn subscribe_tickers(&mut self, symbols: &[Symbol]) -> crate::Result<()> {
+        self.subscribe_book_tickers(symbols).await
+    }
+
+    async fn next_message(&mut self) -> crate::Result<Option<ExchangeMessage>> {
+        match self.recv().await? {
+            Some(BinanceMessage::Trade(trade)) => {
+                Ok(Some(ExchangeMessage::Trade(Exchange::Binance, trade)))
+            }
+            Some(BinanceMessage::Ticker(ticker)) => {
+                Ok(Some(ExchangeMessage::Ticker(Exchange::Binance, ticker)))
+            }
+            Some(BinanceMessage::Heartbeat) => Ok(Some(ExchangeMessage::Heartbeat)),
+            Some(BinanceMessage::SubscriptionConfirmed) => {
+                // Subscription confirmations don't map to ExchangeMessage
+                // Could be treated as Heartbeat or ignored
+                Ok(Some(ExchangeMessage::Heartbeat))
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[inline]
+    fn is_connected(&self) -> bool {
+        self.connection.as_ref()
+            .map(|c| c.is_connected())
+            .unwrap_or(false)
+    }
+
+    #[inline]
+    fn last_activity(&self) -> std::time::Instant {
+        self.last_message.into_std()
     }
 }
 
