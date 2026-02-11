@@ -158,7 +158,7 @@ impl WebSocketConnection {
     /// # HFT Optimizations
     /// - Reuses internal buffer (no allocation per message)
     /// - Returns None on graceful close
-    /// - No logging in hot path
+    /// - No logging in hot path (except debug)
     pub async fn recv(&mut self) -> Result<Option<Message>> {
         if self.state != ConnectionState::Connected {
             return Err(WebSocketError::NotConnected);
@@ -166,24 +166,19 @@ impl WebSocketConnection {
 
         match self.stream.next().await {
             Some(Ok(msg)) => {
+                // tracing::debug!("WS Recv: {:?}", msg);
                 self.last_activity = Instant::now();
-
-                // Handle ping/pong automatically
-                match &msg {
-                    Message::Ping(_) => {
-                        // Auto-respond with pong
-                        // Note: tokio-tungstenite usually handles this
-                    }
-                    Message::Close(_) => {
-                        self.state = ConnectionState::Disconnected;
-                    }
-                    _ => {}
-                }
-
+                
+                // ...
+                
                 Ok(Some(msg))
             }
-            Some(Err(e)) => Err(WebSocketError::ReceiveFailed(e.to_string())),
+            Some(Err(e)) => {
+                tracing::error!("WS Error: {}", e);
+                Err(WebSocketError::ReceiveFailed(e.to_string()))
+            },
             None => {
+                tracing::warn!("WS Stream ended (None)");
                 self.state = ConnectionState::Disconnected;
                 Ok(None)
             }

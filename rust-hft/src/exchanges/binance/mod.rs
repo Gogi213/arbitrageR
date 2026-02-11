@@ -3,7 +3,7 @@
 //! Native WebSocket client for Binance Futures exchange.
 //! Handles aggTrade and bookTicker streams.
 
-use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData};
+use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper};
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
@@ -66,25 +66,29 @@ impl BinanceWsClient {
         let batches = self.subscriptions.create_batches(StreamType::Trade);
         
         for batch in batches {
-            let stream_names: Vec<String> = batch.symbols
-                .iter()
-                .map(|s| format!("{}{}", s.as_str().to_lowercase(), "@aggTrade"))
+            let params: Vec<String> = batch.symbols.iter()
+                .map(|s| {
+                    // Use mapper to get exchange-specific name (e.g. 1000PEPEUSDT)
+                    let name = SymbolMapper::get_name(*s, Exchange::Binance).unwrap_or(s.as_str());
+                    format!("{}@aggTrade", name.to_lowercase())
+                })
                 .collect();
             
-            let subscribe_msg = format!(
-                "{{\"method\":\"SUBSCRIBE\",\"params\":{},\"id\":1}}",
-                serde_json::to_string(&stream_names).unwrap_or_default()
-            );
+            let request = serde_json::json!({
+                "method": "SUBSCRIBE",
+                "params": params,
+                "id": 1
+            });
             
             if let Some(conn) = self.connection.as_mut() {
-                conn.send_text(&subscribe_msg).await
+                conn.send_text(&request.to_string()).await
                     .map_err(|e| HftError::WebSocket(e.to_string()))?;
             }
         }
         
         Ok(())
     }
-
+    
     /// Subscribe to bookTicker stream for symbols
     pub async fn subscribe_book_tickers(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
@@ -96,18 +100,21 @@ impl BinanceWsClient {
         let batches = self.subscriptions.create_batches(StreamType::Ticker);
         
         for batch in batches {
-            let stream_names: Vec<String> = batch.symbols
-                .iter()
-                .map(|s| format!("{}{}", s.as_str().to_lowercase(), "@bookTicker"))
+            let params: Vec<String> = batch.symbols.iter()
+                .map(|s| {
+                    let name = SymbolMapper::get_name(*s, Exchange::Binance).unwrap_or(s.as_str());
+                    format!("{}@bookTicker", name.to_lowercase())
+                })
                 .collect();
             
-            let subscribe_msg = format!(
-                "{{\"method\":\"SUBSCRIBE\",\"params\":{},\"id\":1}}",
-                serde_json::to_string(&stream_names).unwrap_or_default()
-            );
+            let request = serde_json::json!({
+                "method": "SUBSCRIBE",
+                "params": params,
+                "id": 1
+            });
             
             if let Some(conn) = self.connection.as_mut() {
-                conn.send_text(&subscribe_msg).await
+                conn.send_text(&request.to_string()).await
                     .map_err(|e| HftError::WebSocket(e.to_string()))?;
             }
         }
@@ -118,23 +125,32 @@ impl BinanceWsClient {
     /// Receive and process next message
     pub async fn recv(&mut self) -> Result<Option<BinanceMessage>> {
         if let Some(conn) = self.connection.as_mut() {
-            match conn.recv().await {
-                Ok(Some(msg)) => {
-                    self.last_message = Instant::now();
-                    self.monitor.record_activity();
-                    
-                    // Parse message
-                    if let Some(text) = msg.to_text().ok() {
-                        return self.parse_message(text);
+            loop {
+                match conn.recv().await {
+                    Ok(Some(msg)) => {
+                        self.last_message = Instant::now();
+                        self.monitor.record_activity();
+                        
+                        // Parse message
+                        if let Ok(text) = msg.to_text() {
+                            match Self::parse_message_static(text) {
+                                Ok(Some(parsed)) => return Ok(Some(parsed)),
+                                Ok(None) => continue, // Unknown message, skip
+                                Err(e) => {
+                                    tracing::warn!("Parse error: {}", e);
+                                    continue;
+                                }
+                            }
+                        }
                     }
-                }
-                Ok(None) => {
-                    // Connection closed
-                    self.connection = None;
-                    return Ok(None);
-                }
-                Err(e) => {
-                    return Err(HftError::WebSocket(e.to_string()));
+                    Ok(None) => {
+                        // Connection closed
+                        self.connection = None;
+                        return Ok(None);
+                    }
+                    Err(e) => {
+                        return Err(HftError::WebSocket(e.to_string()));
+                    }
                 }
             }
         }
@@ -142,9 +158,8 @@ impl BinanceWsClient {
         Ok(None)
     }
 
-    /// Parse Binance message into structured data
-    fn parse_message(
-        &mut self,
+    /// Parse Binance message into structured data (static version)
+    fn parse_message_static(
         text: &str,
     ) -> Result<Option<BinanceMessage>> {
         let data = text.as_bytes();
@@ -171,6 +186,14 @@ impl BinanceWsClient {
                 Ok(None)
             }
         }
+    }
+
+    /// Parse Binance message into structured data (instance version wrapper)
+    fn parse_message(
+        &mut self,
+        text: &str,
+    ) -> Result<Option<BinanceMessage>> {
+        Self::parse_message_static(text)
     }
 
     /// Check if connected
@@ -285,18 +308,12 @@ mod tests {
     #[test]
     fn test_parse_agg_trade() {
         let client = BinanceWsClient::new();
-        
         // Note: This test would need actual JSON parsing
-        // For now, just verify the method exists
     }
 
     #[test]
     fn test_parse_book_ticker() {
         let client = BinanceWsClient::new();
-        
         // Note: This test would need actual JSON parsing
     }
 }
-
-// TODO Phase 3.3: Implement zero-copy parsing benchmarks
-// Benchmark target: <5μs for JSON → TradeData/TickerData

@@ -3,11 +3,13 @@
 //! Native WebSocket client for Bybit Futures exchange using V5 API.
 //! Handles public trade and ticker streams.
 
-use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData};
+use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper};
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
 use crate::exchanges::parsing::{BybitParser, BybitMessageType};
+use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
+use crate::exchanges::Exchange;
 use crate::{HftError, Result};
 use std::time::Duration;
 use tokio::time::{interval, Instant};
@@ -80,7 +82,10 @@ impl BybitWsClient {
         // Create topics for V5 protocol
         let topics: Vec<String> = symbols
             .iter()
-            .map(|s| format!("publicTrade.{}", s.as_str()))
+            .map(|s| {
+                let name = SymbolMapper::get_name(*s, Exchange::Bybit).unwrap_or(s.as_str());
+                format!("publicTrade.{}", name)
+            })
             .collect();
         
         // Send V5 subscription message
@@ -120,7 +125,10 @@ impl BybitWsClient {
         
         let topics: Vec<String> = symbols
             .iter()
-            .map(|s| format!("tickers.{}", s.as_str()))
+            .map(|s| {
+                let name = SymbolMapper::get_name(*s, Exchange::Bybit).unwrap_or(s.as_str());
+                format!("tickers.{}", name)
+            })
             .collect();
         
         let args: Vec<serde_json::Value> = topics
@@ -154,7 +162,10 @@ impl BybitWsClient {
         
         let topics: Vec<String> = symbols
             .iter()
-            .map(|s| format!("orderbook.1.{}", s.as_str()))
+            .map(|s| {
+                let name = SymbolMapper::get_name(*s, Exchange::Bybit).unwrap_or(s.as_str());
+                format!("orderbook.1.{}", name)
+            })
             .collect();
         
         let args: Vec<serde_json::Value> = topics
@@ -179,23 +190,32 @@ impl BybitWsClient {
     /// Receive and process next message
     pub async fn recv(&mut self) -> Result<Option<BybitMessage>> {
         if let Some(conn) = self.connection.as_mut() {
-            match conn.recv().await {
-                Ok(Some(msg)) => {
-                    self.last_message = Instant::now();
-                    self.monitor.record_activity();
-                    
-                    // Parse message
-                    if let Some(text) = msg.to_text().ok() {
-                        return self.parse_message(text);
+            loop {
+                match conn.recv().await {
+                    Ok(Some(msg)) => {
+                        self.last_message = Instant::now();
+                        self.monitor.record_activity();
+                        
+                        // Parse message
+                        if let Ok(text) = msg.to_text() {
+                            match Self::parse_message_static(text) {
+                                Ok(Some(parsed)) => return Ok(Some(parsed)),
+                                Ok(None) => continue, // Unknown/Skip
+                                Err(e) => {
+                                    tracing::warn!("Parse error: {}", e);
+                                    continue;
+                                }
+                            }
+                        }
                     }
-                }
-                Ok(None) => {
-                    // Connection closed
-                    self.connection = None;
-                    return Ok(None);
-                }
-                Err(e) => {
-                    return Err(HftError::WebSocket(e.to_string()));
+                    Ok(None) => {
+                        // Connection closed
+                        self.connection = None;
+                        return Ok(None);
+                    }
+                    Err(e) => {
+                        return Err(HftError::WebSocket(e.to_string()));
+                    }
                 }
             }
         }
@@ -203,8 +223,8 @@ impl BybitWsClient {
         Ok(None)
     }
 
-    /// Parse Bybit V5 message
-    fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>> {
+    /// Parse Bybit V5 message (static)
+    fn parse_message_static(text: &str) -> Result<Option<BybitMessage>> {
         let data = text.as_bytes();
 
         // Detect message type and parse accordingly
@@ -232,6 +252,11 @@ impl BybitWsClient {
                 Ok(None)
             }
         }
+    }
+
+    /// Parse Bybit V5 message
+    fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>> {
+        Self::parse_message_static(text)
     }
 
     /// Check if connected
@@ -282,9 +307,6 @@ impl Default for BybitWsClient {
 }
 
 // === WebSocketExchange Trait Implementation ===
-
-use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
-use crate::exchanges::Exchange;
 
 impl WebSocketExchange for BybitWsClient {
     #[inline]

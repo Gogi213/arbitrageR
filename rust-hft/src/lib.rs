@@ -8,6 +8,7 @@ pub mod hot_path;
 pub mod infrastructure;
 pub mod rest;
 pub mod ws;
+pub mod engine;
 
 use thiserror::Error;
 

@@ -13,6 +13,9 @@
 
 use rust_hft::hot_path::ThresholdTracker;
 use rust_hft::infrastructure::start_server;
+use rust_hft::engine::AppEngine;
+use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
+use rust_hft::core::Symbol;
 use rust_hft::{HftError, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -55,15 +58,32 @@ impl HftApp {
             }
         });
         
-        // 3. TODO: Start WebSocket Clients (Hot Path)
-        // This will be implemented in Phase 4.4 integration
+        // 3. Start AppEngine (Hot Path)
+        let mut engine = AppEngine::new(tracker.clone());
         
-        tracing::info!("System initialized. Waiting for connections...");
+        // Add exchanges
+        engine.add_exchange(ExchangeClient::Binance(BinanceWsClient::new()));
+        engine.add_exchange(ExchangeClient::Bybit(BybitWsClient::new()));
         
-        // Keep main loop running
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        }
+        // Define symbols to track
+        let symbols = vec![
+            Symbol::BTCUSDT,
+            Symbol::ETHUSDT,
+            Symbol::SOLUSDT,
+            Symbol::BNBUSDT,
+            Symbol::XRPUSDT,
+            Symbol::ADAUSDT,
+            Symbol::DOGEUSDT,
+            Symbol::AVAXUSDT,
+            Symbol::TRXUSDT,
+            Symbol::DOTUSDT,
+            Symbol::PEPEUSDT,
+        ];
+        
+        // Run engine (this blocks the task)
+        engine.run(&symbols).await?;
+        
+        Ok(())
     }
 }
 
@@ -74,7 +94,7 @@ async fn main() -> Result<()> {
     
     // TODO: Load config from file
     let config = Config {
-        api_port: 3000,
+        api_port: 5000,
     };
     
     let app = HftApp::new(config).await?;
