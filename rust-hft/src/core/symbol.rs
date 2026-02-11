@@ -47,6 +47,7 @@ impl Symbol {
             b"AVAXUSDT" => return Some(Symbol::AVAXUSDT),
             b"TRXUSDT" => return Some(Symbol::TRXUSDT),
             b"DOTUSDT" => return Some(Symbol::DOTUSDT),
+            b"PEPEUSDT" => return Some(Symbol::PEPEUSDT),
             _ => {}
         }
 
@@ -68,6 +69,7 @@ impl Symbol {
             7 => "AVAXUSDT",
             8 => "TRXUSDT",
             9 => "DOTUSDT",
+            10 => "PEPEUSDT",
             _ => Self::lookup_dynamic_name(self.0).unwrap_or("UNKNOWN"),
         }
     }
@@ -119,6 +121,7 @@ impl Symbol {
     pub const AVAXUSDT: Self = Self(7);
     pub const TRXUSDT: Self = Self(8);
     pub const DOTUSDT: Self = Self(9);
+    pub const PEPEUSDT: Self = Self(10);
 }
 
 impl Default for Symbol {
@@ -128,7 +131,7 @@ impl Default for Symbol {
     }
 }
 
-const STATIC_SYMBOL_COUNT: u32 = 10;
+const STATIC_SYMBOL_COUNT: u32 = 11;
 
 #[cfg(test)]
 mod tests {

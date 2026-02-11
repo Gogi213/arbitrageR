@@ -8,8 +8,10 @@
 
 pub mod fixed_point;
 pub mod symbol;
+pub mod symbol_map;
 pub mod market_data;
 
 pub use fixed_point::FixedPoint8;
 pub use market_data::{Side, TickerData, TradeData};
 pub use symbol::Symbol;
+pub use symbol_map::{SymbolInfo, SymbolMapper};
