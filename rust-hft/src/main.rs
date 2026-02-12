@@ -16,7 +16,7 @@ use rust_hft::infrastructure::start_server;
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
 use rust_hft::core::Symbol;
-use rust_hft::{HftError, Result};
+use rust_hft::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
