@@ -186,6 +186,114 @@ impl SymbolDiscovery {
         
         Ok(all_symbols)
     }
+
+    /// Fetch symbol names only (for registration before parsing)
+    /// Returns unique USDT symbol names sorted by volume
+    pub async fn fetch_symbol_names(&self) -> Result<Vec<String>, DiscoveryError> {
+        let (binance_result, bybit_result) = tokio::join!(
+            self.fetch_binance_names(),
+            self.fetch_bybit_names()
+        );
+
+        let mut all_names: Vec<(String, f64)> = Vec::new();
+
+        if let Ok(binance) = binance_result {
+            all_names.extend(binance);
+        }
+
+        if let Ok(bybit) = bybit_result {
+            all_names.extend(bybit);
+        }
+
+        if all_names.is_empty() {
+            return Err(DiscoveryError::NoSymbols);
+        }
+
+        // Sort by volume descending
+        all_names.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // Deduplicate by name (keep highest volume)
+        let mut seen = std::collections::HashSet::new();
+        let names: Vec<String> = all_names
+            .into_iter()
+            .filter(|(name, _)| seen.insert(name.clone()))
+            .map(|(name, _)| name)
+            .collect();
+
+        Ok(names)
+    }
+
+    /// Fetch Binance symbol names with volumes
+    async fn fetch_binance_names(&self) -> Result<Vec<(String, f64)>, DiscoveryError> {
+        let url = "https://fapi.binance.com/fapi/v1/ticker/24hr";
+
+        let response = self.client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(DiscoveryError::Http(response.status().as_u16()));
+        }
+
+        let tickers: Vec<Binance24hTicker> = response
+            .json()
+            .await
+            .map_err(|e| DiscoveryError::Parse(e.to_string()))?;
+
+        let names: Vec<(String, f64)> = tickers
+            .into_iter()
+            .filter(|t| t.quote_volume >= self.min_volume)
+            .filter(|t| t.symbol.ends_with("USDT"))
+            .map(|t| (t.symbol, t.quote_volume))
+            .collect();
+
+        Ok(names)
+    }
+
+    /// Fetch Bybit symbol names with volumes
+    async fn fetch_bybit_names(&self) -> Result<Vec<(String, f64)>, DiscoveryError> {
+        let url = "https://api.bybit.com/v5/market/tickers?category=linear";
+
+        let response = self.client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| DiscoveryError::Network(e.to_string()))?;
+
+        if !response.status().is_success() {
+            return Err(DiscoveryError::Http(response.status().as_u16()));
+        }
+
+        let bybit_response: BybitTickersResponse = response
+            .json()
+            .await
+            .map_err(|e| DiscoveryError::Parse(e.to_string()))?;
+
+        if bybit_response.ret_code != 0 {
+            return Err(DiscoveryError::Api(bybit_response.ret_msg));
+        }
+
+        let names: Vec<(String, f64)> = bybit_response.result.list
+            .into_iter()
+            .filter(|t| {
+                let volume = t.volume_24h.parse::<f64>().unwrap_or(0.0)
+                    * t.last_price.parse::<f64>().unwrap_or(0.0);
+                volume >= self.min_volume
+            })
+            .filter(|t| t.symbol.ends_with("USDT"))
+            .map(|t| {
+                let volume = t.volume_24h.parse::<f64>().unwrap_or(0.0)
+                    * t.last_price.parse::<f64>().unwrap_or(0.0);
+                (t.symbol, volume)
+            })
+            .collect();
+
+        Ok(names)
+    }
 }
 
 impl Default for SymbolDiscovery {

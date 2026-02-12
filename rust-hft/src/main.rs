@@ -15,7 +15,7 @@ use rust_hft::hot_path::ThresholdTracker;
 use rust_hft::infrastructure::start_server;
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
-use rust_hft::core::{Symbol, SymbolDiscovery};
+use rust_hft::core::{Symbol, SymbolDiscovery, SymbolRegistry};
 use rust_hft::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -67,26 +67,71 @@ impl HftApp {
         
         // 4. Discover liquid symbols dynamically (Cold Path - startup only)
         tracing::info!("Discovering liquid symbols from exchanges...");
-        let discovery = SymbolDiscovery::new();
         
-        let symbols = match discovery.fetch_all_liquid().await {
-            Ok(discovered) => {
-                let symbols: Vec<Symbol> = discovered.into_iter()
-                    .map(|d| d.symbol)
-                    .collect();
-                tracing::info!("Discovered {} liquid symbols", symbols.len());
-                symbols
+        let symbols = if !SymbolRegistry::is_initialized() {
+            // Step 1: Fetch symbol names only (without parsing)
+            let discovery = SymbolDiscovery::new();
+            match discovery.fetch_symbol_names().await {
+                Ok(names) => {
+                    tracing::info!("Fetched {} symbol names", names.len());
+                    
+                    // Step 2: Register symbols in global registry
+                    if let Err(e) = SymbolRegistry::initialize(&names) {
+                        tracing::warn!("Failed to initialize symbol registry: {}. Using fallback.", e);
+                        vec![
+                            Symbol::BTCUSDT,
+                            Symbol::ETHUSDT,
+                            Symbol::SOLUSDT,
+                            Symbol::BNBUSDT,
+                            Symbol::XRPUSDT,
+                        ]
+                    } else {
+                        // Step 3: Now fetch full data with registered symbols
+                        match discovery.fetch_all_liquid().await {
+                            Ok(discovered) => {
+                                let symbols: Vec<Symbol> = discovered.into_iter()
+                                    .map(|d| d.symbol)
+                                    .collect();
+                                tracing::info!("Discovered {} liquid symbols after registration", symbols.len());
+                                symbols
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to fetch liquid symbols: {}. Using fallback.", e);
+                                vec![
+                                    Symbol::BTCUSDT,
+                                    Symbol::ETHUSDT,
+                                    Symbol::SOLUSDT,
+                                    Symbol::BNBUSDT,
+                                    Symbol::XRPUSDT,
+                                ]
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch symbol names: {}. Using fallback.", e);
+                    // Fallback to major pairs
+                    vec![
+                        Symbol::BTCUSDT,
+                        Symbol::ETHUSDT,
+                        Symbol::SOLUSDT,
+                        Symbol::BNBUSDT,
+                        Symbol::XRPUSDT,
+                    ]
+                }
             }
-            Err(e) => {
-                tracing::warn!("Failed to discover symbols: {}. Using fallback.", e);
-                // Fallback to major pairs if discovery fails
-                vec![
+        } else {
+            // Registry already initialized
+            let discovery = SymbolDiscovery::new();
+            match discovery.fetch_all_liquid().await {
+                Ok(discovered) => discovered.into_iter().map(|d| d.symbol).collect(),
+                Err(_) => vec![
                     Symbol::BTCUSDT,
                     Symbol::ETHUSDT,
                     Symbol::SOLUSDT,
                     Symbol::BNBUSDT,
                     Symbol::XRPUSDT,
-                ]
+                ],
             }
         };
         
