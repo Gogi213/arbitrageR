@@ -25,14 +25,14 @@ pub struct SpreadCalculator;
 
 impl SpreadCalculator {
     /// Calculate spread between two tickers
-    /// 
+    ///
     /// Formula: (Bid_Short - Ask_Long) / Ask_Long
     /// Returns the best spread opportunity (Long A/Short B or Long B/Short A)
     #[inline]
     pub fn calculate(
         symbol: Symbol,
         binance: &TickerData,
-        bybit: &TickerData
+        bybit: &TickerData,
     ) -> Option<SpreadEvent> {
         // Validate symbols match
         // In hot path we assume caller checked this, but debug assert helps
@@ -44,7 +44,8 @@ impl SpreadCalculator {
         // Profit = (Bybit Bid - Binance Ask) / Binance Ask
         // We want to buy low (Ask) and sell high (Bid)
         let spread_long_binance = if binance.ask_price.is_positive() {
-             bybit.bid_price
+            bybit
+                .bid_price
                 .checked_sub(binance.ask_price)
                 .and_then(|diff| diff.safe_div(binance.ask_price))
                 .unwrap_or(FixedPoint8::ZERO)
@@ -55,7 +56,8 @@ impl SpreadCalculator {
         // 2. Check Long Bybit (Buy) / Short Binance (Sell)
         // Profit = (Binance Bid - Bybit Ask) / Bybit Ask
         let spread_long_bybit = if bybit.ask_price.is_positive() {
-            binance.bid_price
+            binance
+                .bid_price
                 .checked_sub(bybit.ask_price)
                 .and_then(|diff| diff.safe_div(bybit.ask_price))
                 .unwrap_or(FixedPoint8::ZERO)
@@ -85,13 +87,16 @@ impl SpreadCalculator {
 }
 
 #[cfg(test)]
+use crate::test_utils::init_test_registry;
 mod tests {
     use super::*;
-    use crate::core::FixedPoint8;
+    use crate::core::{registry::SymbolRegistry, FixedPoint8};
+
 
     fn make_ticker(bid: i64, ask: i64) -> TickerData {
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
         TickerData {
-            symbol: Symbol::BTCUSDT,
+            symbol: sym,
             bid_price: FixedPoint8::from_raw(bid * FixedPoint8::SCALE),
             ask_price: FixedPoint8::from_raw(ask * FixedPoint8::SCALE),
             bid_qty: FixedPoint8::ONE,
@@ -102,43 +107,40 @@ mod tests {
 
     #[test]
     fn test_spread_long_binance() {
-        // Binance: Buy at 100 (Ask)
-        // Bybit: Sell at 101 (Bid)
-        // Spread = (101 - 100) / 100 = 0.01 (1%)
+        init_test_registry();
         let binance = make_ticker(99, 100);
         let bybit = make_ticker(101, 102);
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
 
-        let event = SpreadCalculator::calculate(Symbol::BTCUSDT, &binance, &bybit).unwrap();
-        
+        let event = SpreadCalculator::calculate(sym, &binance, &bybit).unwrap();
+
         assert_eq!(event.long_ex, Exchange::Binance);
         assert_eq!(event.short_ex, Exchange::Bybit);
-        assert_eq!(event.spread, FixedPoint8::from_raw(1_000_000)); // 0.01 * 10^8
+        assert_eq!(event.spread, FixedPoint8::from_raw(1_000_000));
     }
 
     #[test]
     fn test_spread_long_bybit() {
-        // Binance: Sell at 101 (Bid)
-        // Bybit: Buy at 100 (Ask)
-        // Spread = (101 - 100) / 100 = 0.01
+        init_test_registry();
         let binance = make_ticker(101, 102);
         let bybit = make_ticker(99, 100);
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
 
-        let event = SpreadCalculator::calculate(Symbol::BTCUSDT, &binance, &bybit).unwrap();
-        
+        let event = SpreadCalculator::calculate(sym, &binance, &bybit).unwrap();
+
         assert_eq!(event.long_ex, Exchange::Bybit);
         assert_eq!(event.short_ex, Exchange::Binance);
         assert_eq!(event.spread, FixedPoint8::from_raw(1_000_000));
     }
-    
+
     #[test]
     fn test_negative_spread() {
-        // Binance: 100/101
-        // Bybit: 100/101
-        // No arb: (100 - 101) / 101 = -0.0099
+        init_test_registry();
         let binance = make_ticker(100, 101);
         let bybit = make_ticker(100, 101);
-        
-        let event = SpreadCalculator::calculate(Symbol::BTCUSDT, &binance, &bybit).unwrap();
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
+
+        let event = SpreadCalculator::calculate(sym, &binance, &bybit).unwrap();
         assert!(event.spread.is_negative());
     }
 }

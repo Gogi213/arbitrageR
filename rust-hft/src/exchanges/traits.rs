@@ -102,15 +102,20 @@ impl<T: WebSocketExchange> AnyExchange for T {
 }
 
 #[cfg(test)]
+use crate::test_utils::init_test_registry;
 mod tests {
     use super::*;
-    
+    use crate::core::registry::SymbolRegistry;
+
+
     #[test]
     fn test_exchange_message_variants() {
+        init_test_registry();
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
         let trade = ExchangeMessage::Trade(
             Exchange::Binance,
             TradeData::new(
-                Symbol::BTCUSDT,
+                sym,
                 crate::core::FixedPoint8::ONE,
                 crate::core::FixedPoint8::ONE,
                 1234567890,
@@ -122,7 +127,7 @@ mod tests {
         match trade {
             ExchangeMessage::Trade(ex, data) => {
                 assert_eq!(ex, Exchange::Binance);
-                assert_eq!(data.symbol, Symbol::BTCUSDT);
+                assert_eq!(data.symbol.as_str(), "BTCUSDT");
             }
             _ => panic!("Expected Trade variant"),
         }

@@ -73,60 +73,7 @@ impl SymbolRegistry {
             return None;
         }
 
-        // Fast path for common symbols (pre-defined IDs)
-        match name {
-            b"BTCUSDT" => return Some(Symbol::from_raw(0)),
-            b"ETHUSDT" => return Some(Symbol::from_raw(1)),
-            b"SOLUSDT" => return Some(Symbol::from_raw(2)),
-            b"BNBUSDT" => return Some(Symbol::from_raw(3)),
-            b"XRPUSDT" => return Some(Symbol::from_raw(4)),
-            b"ADAUSDT" => return Some(Symbol::from_raw(5)),
-            b"DOGEUSDT" => return Some(Symbol::from_raw(6)),
-            b"AVAXUSDT" => return Some(Symbol::from_raw(7)),
-            b"TRXUSDT" => return Some(Symbol::from_raw(8)),
-            b"DOTUSDT" => return Some(Symbol::from_raw(9)),
-            b"PEPEUSDT" => return Some(Symbol::from_raw(10)),
-            b"TNSRUSDT" => return Some(Symbol::from_raw(11)),
-            b"BERAUSDT" => return Some(Symbol::from_raw(12)),
-            b"TRIAUSDT" => return Some(Symbol::from_raw(13)),
-            b"BLESSUSDT" => return Some(Symbol::from_raw(14)),
-            b"DYDXUSDT" => return Some(Symbol::from_raw(15)),
-            b"MYXUSDT" => return Some(Symbol::from_raw(16)),
-            b"SKRUSDT" => return Some(Symbol::from_raw(17)),
-            b"SONICUSDT" => return Some(Symbol::from_raw(18)),
-            b"WIFUSDT" => return Some(Symbol::from_raw(19)),
-            b"BONKUSDT" => return Some(Symbol::from_raw(20)),
-            b"FLOKIUSDT" => return Some(Symbol::from_raw(21)),
-            b"LINKUSDT" => return Some(Symbol::from_raw(22)),
-            b"UNIUSDT" => return Some(Symbol::from_raw(23)),
-            b"AAVEUSDT" => return Some(Symbol::from_raw(24)),
-            b"APTVUSDT" => return Some(Symbol::from_raw(25)),
-            b"ARBUSDT" => return Some(Symbol::from_raw(26)),
-            b"CATUSDT" => return Some(Symbol::from_raw(27)),
-            b"ENAUSDT" => return Some(Symbol::from_raw(28)),
-            b"GALAUSDT" => return Some(Symbol::from_raw(29)),
-            b"GMTUSDT" => return Some(Symbol::from_raw(30)),
-            b"INJUSDT" => return Some(Symbol::from_raw(31)),
-            b"NEARUSDT" => return Some(Symbol::from_raw(32)),
-            b"OPUSDT" => return Some(Symbol::from_raw(33)),
-            b"RNDRUSDT" => return Some(Symbol::from_raw(34)),
-            b"SANDUSDT" => return Some(Symbol::from_raw(35)),
-            b"SEIUSDT" => return Some(Symbol::from_raw(36)),
-            b"STRKUSDT" => return Some(Symbol::from_raw(37)),
-            b"SUIUSDT" => return Some(Symbol::from_raw(38)),
-            b"TONUSDT" => return Some(Symbol::from_raw(39)),
-            b"TURBOUSDT" => return Some(Symbol::from_raw(40)),
-            b"VIRTUALUSDT" => return Some(Symbol::from_raw(41)),
-            b"WLDUSDT" => return Some(Symbol::from_raw(42)),
-            b"KAITOUSDT" => return Some(Symbol::from_raw(43)),
-            b"LDOUSDT" => return Some(Symbol::from_raw(44)),
-            b"LEVERUSDT" => return Some(Symbol::from_raw(45)),
-            b"MEUSDT" => return Some(Symbol::from_raw(46)),
-            b"PYTHUSDT" => return Some(Symbol::from_raw(47)),
-            _ => {}
-        }
-
-        // Hash-based lookup for dynamic symbols
+        // Hash-based lookup for all symbols
         let hash = hash_symbol_name(name);
         let mut probe = 0;
         loop {
@@ -154,6 +101,10 @@ impl SymbolRegistry {
 
     pub fn count(&self) -> u32 {
         self.count
+    }
+
+    pub fn is_initialized() -> bool {
+        SYMBOL_REGISTRY.get().is_some()
     }
 }
 
@@ -192,61 +143,6 @@ pub enum RegistryError {
     CapacityExceeded,
 }
 
-pub fn initialize_with_defaults() -> Result<(), RegistryError> {
-    let defaults = vec![
-        "BTCUSDT".to_string(),
-        "ETHUSDT".to_string(),
-        "SOLUSDT".to_string(),
-        "BNBUSDT".to_string(),
-        "XRPUSDT".to_string(),
-        "ADAUSDT".to_string(),
-        "DOGEUSDT".to_string(),
-        "AVAXUSDT".to_string(),
-        "TRXUSDT".to_string(),
-        "DOTUSDT".to_string(),
-        "PEPEUSDT".to_string(),
-        "1000PEPEUSDT".to_string(),
-        "LINKUSDT".to_string(),
-        "MATICUSDT".to_string(),
-        "LTCUSDT".to_string(),
-        "TNSRUSDT".to_string(),
-        "BERAUSDT".to_string(),
-        "TRIAUSDT".to_string(),
-        "BLESSUSDT".to_string(),
-        "DYDXUSDT".to_string(),
-        "MYXUSDT".to_string(),
-        "SKRUSDT".to_string(),
-        "SONICUSDT".to_string(),
-        "WIFUSDT".to_string(),
-        "BONKUSDT".to_string(),
-        "FLOKIUSDT".to_string(),
-        "UNIUSDT".to_string(),
-        "AAVEUSDT".to_string(),
-        "ARBUSDT".to_string(),
-        "ENAUSDT".to_string(),
-        "GALAUSDT".to_string(),
-        "GMTUSDT".to_string(),
-        "INJUSDT".to_string(),
-        "NEARUSDT".to_string(),
-        "OPUSDT".to_string(),
-        "RNDRUSDT".to_string(),
-        "SANDUSDT".to_string(),
-        "SEIUSDT".to_string(),
-        "STRKUSDT".to_string(),
-        "SUIUSDT".to_string(),
-        "TONUSDT".to_string(),
-        "TURBOUSDT".to_string(),
-        "VIRTUALUSDT".to_string(),
-        "WLDUSDT".to_string(),
-        "KAITOUSDT".to_string(),
-        "LDOUSDT".to_string(),
-        "LEVERUSDT".to_string(),
-        "MEUSDT".to_string(),
-        "PYTHUSDT".to_string(),
-    ];
-    SymbolRegistry::initialize(&defaults)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,16 +155,17 @@ mod tests {
     #[test]
     fn test_registry_initialization() {
         if !SymbolRegistry::is_initialized() {
-            let symbols = vec!["TESTCOINUSDT".to_string()];
+            let symbols = vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()];
             assert!(SymbolRegistry::initialize(&symbols).is_ok());
         }
     }
     #[test]
     fn test_registry_lookup() {
         if !SymbolRegistry::is_initialized() {
-            initialize_with_defaults().ok();
+            let symbols = vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()];
+            SymbolRegistry::initialize(&symbols).ok();
         }
-        let registry = SymbolRegistry::global();
+        let registry = SymbolRegistry::try_global().unwrap();
         assert!(registry.lookup(b"BTCUSDT").is_some());
         assert!(registry.lookup(b"ETHUSDT").is_some());
     }

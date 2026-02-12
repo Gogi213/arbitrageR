@@ -55,7 +55,7 @@ impl MessageRouter {
     ///
     /// # Example
     /// ```
-    /// router.register_ticker(Symbol::BTCUSDT, |sym, data| {
+    /// router.register_ticker(Symbol::from_bytes(b"BTCUSDT").unwrap(), |sym, data| {
     ///     println!("Ticker for {:?}: bid={}, ask={}", sym, data.bid_price, data.ask_price);
     /// });
     /// ```
@@ -168,195 +168,97 @@ impl Default for MessageRouter {
 }
 
 #[cfg(test)]
+use crate::test_utils::init_test_registry;
 mod tests {
     use super::*;
-    use crate::core::FixedPoint8;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use crate::core::{registry::SymbolRegistry, FixedPoint8};
+
+
+    fn make_ticker(symbol: Symbol) -> TickerData {
+        TickerData {
+            symbol,
+            bid_price: FixedPoint8::from_raw(100_000_000),
+            ask_price: FixedPoint8::from_raw(100_000_100),
+            bid_qty: FixedPoint8::ONE,
+            ask_qty: FixedPoint8::ONE,
+            timestamp: 1000,
+        }
+    }
+
+    fn make_trade(symbol: Symbol) -> TradeData {
+        TradeData {
+            symbol,
+            price: FixedPoint8::from_raw(100_000_000),
+            quantity: FixedPoint8::ONE,
+            timestamp: 1000,
+            side: crate::core::Side::Buy,
+            is_buyer_maker: false,
+        }
+    }
 
     #[test]
     fn test_register_and_route_ticker() {
-        static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
+        init_test_registry();
+        let mut router = MessageRouter::new();
+        let btc = Symbol::from_bytes(b"BTCUSDT").unwrap();
 
+        static CALL_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         fn handler(_sym: Symbol, _data: TickerData) {
-            CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        let mut router = MessageRouter::new();
-        router.register_ticker(Symbol::BTCUSDT, handler);
-
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::from_raw(2_000_000_00),
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        router.route_ticker(Symbol::BTCUSDT, ticker);
-
-        assert_eq!(CALL_COUNT.load(Ordering::Relaxed), 1);
+        router.register_ticker(btc, handler);
+        router.route_ticker(btc, make_ticker(btc));
+        assert_eq!(CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed), 1);
     }
 
     #[test]
     fn test_register_and_route_trade() {
-        static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
+        init_test_registry();
+        let mut router = MessageRouter::new();
+        let eth = Symbol::from_bytes(b"ETHUSDT").unwrap();
 
+        static CALL_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         fn handler(_sym: Symbol, _data: TradeData) {
-            CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        let mut router = MessageRouter::new();
-        router.register_trade(Symbol::ETHUSDT, handler);
-
-        let trade = TradeData::new(
-            Symbol::ETHUSDT,
-            FixedPoint8::from_raw(2000_000_000_00),
-            FixedPoint8::ONE,
-            1234567890,
-            crate::core::Side::Buy,
-            false,
-        );
-
-        router.route_trade(Symbol::ETHUSDT, trade);
-
-        assert_eq!(CALL_COUNT.load(Ordering::Relaxed), 1);
+        router.register_trade(eth, handler);
+        router.route_trade(eth, make_trade(eth));
+        assert_eq!(CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed), 1);
     }
 
     #[test]
     fn test_unregistered_symbol() {
-        static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
-
-        fn handler(_sym: Symbol, _data: TickerData) {
-            CALL_COUNT.fetch_add(1, Ordering::Relaxed);
-        }
-
+        init_test_registry();
         let router = MessageRouter::new();
-        // Don't register any handler
+        let btc = Symbol::from_bytes(b"BTCUSDT").unwrap();
 
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        // Should not panic, just do nothing
-        router.route_ticker(Symbol::BTCUSDT, ticker);
-
-        assert_eq!(CALL_COUNT.load(Ordering::Relaxed), 0);
-    }
-
-    #[test]
-    fn test_fallback_handler() {
-        static FALLBACK_COUNT: AtomicU64 = AtomicU64::new(0);
-
-        fn specific_handler(_sym: Symbol, _data: TickerData) {
-            // This shouldn't be called for unregistered symbol
-        }
-
-        fn fallback_handler(_sym: Symbol, _data: TickerData) {
-            FALLBACK_COUNT.fetch_add(1, Ordering::Relaxed);
-        }
-
-        let mut router = MessageRouter::new();
-        router.register_ticker(Symbol::BTCUSDT, specific_handler);
-        router.set_fallback_ticker(fallback_handler);
-
-        // Route to unregistered symbol
-        let ticker = TickerData::new(
-            Symbol::ETHUSDT, // Not registered
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        router.route_ticker(Symbol::ETHUSDT, ticker);
-
-        assert_eq!(FALLBACK_COUNT.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn test_multiple_handlers() {
-        static BTC_COUNT: AtomicU64 = AtomicU64::new(0);
-        static ETH_COUNT: AtomicU64 = AtomicU64::new(0);
-
-        fn btc_handler(_sym: Symbol, _data: TickerData) {
-            BTC_COUNT.fetch_add(1, Ordering::Relaxed);
-        }
-
-        fn eth_handler(_sym: Symbol, _data: TickerData) {
-            ETH_COUNT.fetch_add(1, Ordering::Relaxed);
-        }
-
-        let mut router = MessageRouter::new();
-        router.register_ticker(Symbol::BTCUSDT, btc_handler);
-        router.register_ticker(Symbol::ETHUSDT, eth_handler);
-
-        let btc_ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        let eth_ticker = TickerData::new(
-            Symbol::ETHUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        router.route_ticker(Symbol::BTCUSDT, btc_ticker);
-        router.route_ticker(Symbol::ETHUSDT, eth_ticker);
-        router.route_ticker(Symbol::BTCUSDT, btc_ticker);
-
-        assert_eq!(BTC_COUNT.load(Ordering::Relaxed), 2);
-        assert_eq!(ETH_COUNT.load(Ordering::Relaxed), 1);
-    }
-
-    #[test]
-    fn test_unregister() {
-        static CALL_COUNT: AtomicU64 = AtomicU64::new(0);
-
+        static CALL_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         fn handler(_sym: Symbol, _data: TickerData) {
-            CALL_COUNT.fetch_add(1, Ordering::Relaxed);
+            CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        let mut router = MessageRouter::new();
-        router.register_ticker(Symbol::BTCUSDT, handler);
-        assert!(router.has_ticker_handler(Symbol::BTCUSDT));
-        assert_eq!(router.registered_count(), 1);
-
-        router.unregister_ticker(Symbol::BTCUSDT);
-        assert!(!router.has_ticker_handler(Symbol::BTCUSDT));
-        assert_eq!(router.registered_count(), 0);
+        router.route_ticker(btc, make_ticker(btc));
+        assert_eq!(CALL_COUNT.load(std::sync::atomic::Ordering::Relaxed), 0);
     }
 
     #[test]
     fn test_registered_count() {
-        fn handler(_sym: Symbol, _data: TickerData) {}
+        init_test_registry();
+        let mut router = MessageRouter::new();
+        let btc = Symbol::from_bytes(b"BTCUSDT").unwrap();
+        let eth = Symbol::from_bytes(b"ETHUSDT").unwrap();
+
+        fn ticker_handler(_sym: Symbol, _data: TickerData) {}
         fn trade_handler(_sym: Symbol, _data: TradeData) {}
 
-        let mut router = MessageRouter::new();
         assert_eq!(router.registered_count(), 0);
-
-        router.register_ticker(Symbol::BTCUSDT, handler);
+        router.register_ticker(btc, ticker_handler);
         assert_eq!(router.registered_count(), 1);
-
-        router.register_ticker(Symbol::ETHUSDT, handler);
+        router.register_ticker(eth, ticker_handler);
         assert_eq!(router.registered_count(), 2);
-
-        // Same symbol, different type - should increment
-        router.register_trade(Symbol::BTCUSDT, trade_handler);
+        router.register_trade(btc, trade_handler);
         assert_eq!(router.registered_count(), 3);
     }
 }

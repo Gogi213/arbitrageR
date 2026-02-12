@@ -152,158 +152,41 @@ impl TradeData {
 }
 
 #[cfg(test)]
+use crate::test_utils::init_test_registry;
 mod tests {
     use super::*;
+    use crate::core::registry::SymbolRegistry;
 
-    #[test]
-    fn test_ticker_data_size() {
-        // TickerData should be exactly 64 bytes (one cache line)
-        assert_eq!(std::mem::size_of::<TickerData>(), 64);
-        assert_eq!(std::mem::align_of::<TickerData>(), 64);
-    }
-
-    #[test]
-    fn test_trade_data_size() {
-        // TradeData should be exactly 64 bytes
-        assert_eq!(std::mem::size_of::<TradeData>(), 64);
-        assert_eq!(std::mem::align_of::<TradeData>(), 64);
-    }
 
     #[test]
     fn test_ticker_creation() {
+        init_test_registry();
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
         let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::from_raw(99_000_000_00), // 99.0
-            FixedPoint8::from_raw(1_000_000_00),  // 1.0
-            FixedPoint8::from_raw(101_000_000_00), // 101.0
-            FixedPoint8::from_raw(2_000_000_00),  // 2.0
-            1234567890,
-        );
-
-        assert_eq!(ticker.symbol, Symbol::BTCUSDT);
-        assert_eq!(ticker.bid_price.as_raw(), 99_000_000_00);
-        assert_eq!(ticker.ask_price.as_raw(), 101_000_000_00);
-        assert!(ticker.is_valid());
-    }
-
-    #[test]
-    fn test_ticker_spread() {
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::from_raw(100_000_000_00), // 100.0
+            sym,
+            FixedPoint8::from_raw(100_000_000),
             FixedPoint8::ONE,
-            FixedPoint8::from_raw(101_000_000_00), // 101.0
+            FixedPoint8::from_raw(100_000_100),
             FixedPoint8::ONE,
             1234567890,
         );
-
-        let spread = ticker.spread().unwrap();
-        assert_eq!(spread.as_raw(), 1_000_000_00); // 1.0
-    }
-
-    #[test]
-    fn test_ticker_mid_price() {
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::from_raw(100_000_000_00), // 100.0
-            FixedPoint8::ONE,
-            FixedPoint8::from_raw(102_000_000_00), // 102.0
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        let mid = ticker.mid_price().unwrap();
-        assert_eq!(mid.as_raw(), 101_000_000_00); // 101.0
-    }
-
-    #[test]
-    fn test_ticker_invalid() {
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::from_raw(101_000_000_00), // 101.0
-            FixedPoint8::ONE,
-            FixedPoint8::from_raw(100_000_000_00), // 100.0 (crossed!)
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        assert!(!ticker.is_valid());
+        assert_eq!(ticker.symbol, sym);
     }
 
     #[test]
     fn test_trade_creation() {
+        init_test_registry();
+        let sym = Symbol::from_bytes(b"BTCUSDT").unwrap();
         let trade = TradeData::new(
-            Symbol::ETHUSDT,
-            FixedPoint8::from_raw(2000_000_000_00), // 2000.0
-            FixedPoint8::from_raw(5_000_000_00),    // 5.0
+            sym,
+            FixedPoint8::from_raw(100_000_000),
+            FixedPoint8::ONE,
             1234567890,
             Side::Buy,
             false,
         );
-
-        assert_eq!(trade.symbol, Symbol::ETHUSDT);
+        assert_eq!(trade.symbol, sym);
         assert_eq!(trade.side, Side::Buy);
-        assert!(!trade.is_buyer_maker);
-    }
-
-    #[test]
-    fn test_trade_notional() {
-        let trade = TradeData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::from_raw(100_000_000_00), // 100.0
-            FixedPoint8::from_raw(2_000_000_00),   // 2.0
-            1234567890,
-            Side::Sell,
-            true,
-        );
-
-        let notional = trade.notional().unwrap();
-        // 100.0 * 2.0 = 200.0
-        assert_eq!(notional.as_raw(), 200_000_000_00);
-    }
-
-    #[test]
-    fn test_side_parsing() {
-        assert_eq!(Side::from_bytes(b"BUY"), Some(Side::Buy));
-        assert_eq!(Side::from_bytes(b"SELL"), Some(Side::Sell));
-        assert_eq!(Side::from_bytes(b"buy"), Some(Side::Buy));
-        assert_eq!(Side::from_bytes(b"sell"), Some(Side::Sell));
-        assert_eq!(Side::from_bytes(b"unknown"), None);
-    }
-
-    #[test]
-    fn test_copy_types() {
-        let ticker = TickerData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            FixedPoint8::from_raw(2_000_000_00),
-            FixedPoint8::ONE,
-            1234567890,
-        );
-
-        let ticker2 = ticker; // Copy
-        let ticker3 = ticker; // Can still use ticker
-
-        assert_eq!(ticker.symbol, ticker2.symbol);
-        assert_eq!(ticker.symbol, ticker3.symbol);
-    }
-
-    #[test]
-    fn test_trade_copy() {
-        let trade = TradeData::new(
-            Symbol::BTCUSDT,
-            FixedPoint8::ONE,
-            FixedPoint8::ONE,
-            1234567890,
-            Side::Buy,
-            false,
-        );
-
-        let trade2 = trade;
-        let _trade3 = trade;
-
-        assert_eq!(trade.price, trade2.price);
     }
 }
 

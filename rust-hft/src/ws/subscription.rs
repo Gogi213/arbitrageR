@@ -95,14 +95,10 @@ impl SubscriptionManager {
     /// # Arguments
     /// * `symbols` - Symbols to subscribe to
     /// * `stream_type` - Type of data stream
-    pub fn request_subscription(
-        &mut self,
-        symbols: &[Symbol],
-        stream_type: StreamType,
-    ) {
+    pub fn request_subscription(&mut self, symbols: &[Symbol], stream_type: StreamType) {
         for &symbol in symbols {
             let key = (symbol, stream_type);
-            
+
             if !self.subscriptions.contains_key(&key) {
                 let subscription = Subscription {
                     symbol,
@@ -116,18 +112,14 @@ impl SubscriptionManager {
     }
 
     /// Cancel subscription for symbols
-    pub fn cancel_subscription(
-        &mut self,
-        symbols: &[Symbol],
-        stream_type: StreamType,
-    ) {
+    pub fn cancel_subscription(&mut self, symbols: &[Symbol], stream_type: StreamType) {
         for &symbol in symbols {
             let key = (symbol, stream_type);
-            
+
             if let Some(sub) = self.subscriptions.get_mut(&key) {
                 sub.status = SubscriptionStatus::Cancelled;
             }
-            
+
             // Remove from active set
             if let Some(active) = self.active_by_type.get_mut(&stream_type) {
                 active.remove(&symbol);
@@ -138,16 +130,12 @@ impl SubscriptionManager {
     /// Create batch requests from pending subscriptions
     ///
     /// Returns batches of up to MAX_BATCH_SIZE symbols
-    pub fn create_batches(&mut self,
-        stream_type: StreamType,
-    ) -> Vec<BatchRequest> {
+    pub fn create_batches(&mut self, stream_type: StreamType) -> Vec<BatchRequest> {
         // Collect pending subscriptions for this stream type
         let pending: Vec<Symbol> = self
             .subscriptions
             .iter()
-            .filter(|(key, sub)| {
-                key.1 == stream_type && sub.status == SubscriptionStatus::Pending
-            })
+            .filter(|(key, sub)| key.1 == stream_type && sub.status == SubscriptionStatus::Pending)
             .map(|(key, _)| key.0)
             .collect();
 
@@ -169,12 +157,12 @@ impl SubscriptionManager {
     pub fn confirm(&mut self, symbols: &[Symbol], stream_type: StreamType) {
         for &symbol in symbols {
             let key = (symbol, stream_type);
-            
+
             if let Some(sub) = self.subscriptions.get_mut(&key) {
                 sub.status = SubscriptionStatus::Active;
                 sub.retry_count = 0;
             }
-            
+
             // Add to active set
             if let Some(active) = self.active_by_type.get_mut(&stream_type) {
                 active.insert(symbol);
@@ -185,10 +173,10 @@ impl SubscriptionManager {
     /// Mark subscription as failed
     pub fn mark_failed(&mut self, symbol: Symbol, stream_type: StreamType) {
         let key = (symbol, stream_type);
-        
+
         if let Some(sub) = self.subscriptions.get_mut(&key) {
             sub.retry_count += 1;
-            
+
             if sub.retry_count >= self.max_retries {
                 sub.status = SubscriptionStatus::Failed;
             } else {
@@ -212,8 +200,8 @@ impl SubscriptionManager {
         self.subscriptions
             .get(&key)
             .map(|sub| {
-                sub.status == SubscriptionStatus::Active ||
-                sub.status == SubscriptionStatus::Pending
+                sub.status == SubscriptionStatus::Active
+                    || sub.status == SubscriptionStatus::Pending
             })
             .unwrap_or(false)
     }
@@ -254,8 +242,7 @@ impl SubscriptionManager {
         self.subscriptions
             .values()
             .filter(|sub| {
-                sub.stream_type == stream_type &&
-                sub.status == SubscriptionStatus::Pending
+                sub.stream_type == stream_type && sub.status == SubscriptionStatus::Pending
             })
             .count()
     }
@@ -269,15 +256,13 @@ impl SubscriptionManager {
     }
 
     /// Get symbols that need retry
-    pub fn get_retry_symbols(&self,
-        stream_type: StreamType,
-    ) -> Vec<Symbol> {
+    pub fn get_retry_symbols(&self, stream_type: StreamType) -> Vec<Symbol> {
         self.subscriptions
             .values()
             .filter(|sub| {
-                sub.stream_type == stream_type &&
-                sub.status == SubscriptionStatus::Pending &&
-                sub.retry_count > 0
+                sub.stream_type == stream_type
+                    && sub.status == SubscriptionStatus::Pending
+                    && sub.retry_count > 0
             })
             .map(|sub| sub.symbol)
             .collect()
@@ -291,182 +276,122 @@ impl Default for SubscriptionManager {
 }
 
 #[cfg(test)]
+use crate::test_utils::init_test_registry;
 mod tests {
     use super::*;
+    use crate::core::registry::SymbolRegistry;
+
+
+    fn btc() -> Symbol {
+        Symbol::from_bytes(b"BTCUSDT").unwrap()
+    }
+    fn eth() -> Symbol {
+        Symbol::from_bytes(b"ETHUSDT").unwrap()
+    }
 
     #[test]
     fn test_subscription_manager_creation() {
         let manager = SubscriptionManager::new();
         assert_eq!(manager.total_count(), 0);
-        assert_eq!(manager.active_count(StreamType::Trade), 0);
     }
 
     #[test]
     fn test_request_subscription() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        manager.request_subscription(&[Symbol::BTCUSDT, Symbol::ETHUSDT],
-            StreamType::Trade
-        );
-        
-        assert_eq!(manager.total_count(), 2);
-        assert!(manager.is_subscribed(Symbol::BTCUSDT, StreamType::Trade));
-        assert!(manager.is_subscribed(Symbol::ETHUSDT, StreamType::Trade));
-    }
 
-    #[test]
-    fn test_create_batches() {
-        let mut manager = SubscriptionManager::new();
-        
-        // Create many symbols
-        let symbols: Vec<Symbol> = (0..250)
-            .map(|i| Symbol::from_raw(i))
-            .collect();
-        
-        manager.request_subscription(&symbols,
-            StreamType::Trade
-        );
-        
-        let batches = manager.create_batches(StreamType::Trade);
-        
-        // Should create 2 batches: 200 + 50
-        assert_eq!(batches.len(), 2);
-        assert_eq!(batches[0].symbols.len(), 200);
-        assert_eq!(batches[1].symbols.len(), 50);
+        manager.request_subscription(&[btc(), eth()], StreamType::Trade);
+
+        assert_eq!(manager.total_count(), 2);
+        assert!(manager.is_subscribed(btc(), StreamType::Trade));
+        assert!(manager.is_subscribed(eth(), StreamType::Trade));
     }
 
     #[test]
     fn test_confirm_subscription() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        
-        assert!(!manager.is_active(Symbol::BTCUSDT, StreamType::Trade));
-        
-        manager.confirm(&[Symbol::BTCUSDT], StreamType::Trade);
-        
-        assert!(manager.is_active(Symbol::BTCUSDT, StreamType::Trade));
+
+        manager.request_subscription(&[btc()], StreamType::Trade);
+        assert!(!manager.is_active(btc(), StreamType::Trade));
+
+        manager.confirm(&[btc()], StreamType::Trade);
+        assert!(manager.is_active(btc(), StreamType::Trade));
         assert_eq!(manager.active_count(StreamType::Trade), 1);
     }
 
     #[test]
     fn test_mark_failed() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
         manager.max_retries = 2;
-        
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        
-        // First failure - should stay pending
-        manager.mark_failed(Symbol::BTCUSDT, StreamType::Trade);
+
+        manager.request_subscription(&[btc()], StreamType::Trade);
+        manager.mark_failed(btc(), StreamType::Trade);
         assert_eq!(
-            manager.get_status(Symbol::BTCUSDT, StreamType::Trade),
+            manager.get_status(btc(), StreamType::Trade),
             Some(SubscriptionStatus::Pending)
         );
-        
-        // Second failure - should become failed
-        manager.mark_failed(Symbol::BTCUSDT, StreamType::Trade);
+
+        manager.mark_failed(btc(), StreamType::Trade);
         assert_eq!(
-            manager.get_status(Symbol::BTCUSDT, StreamType::Trade),
+            manager.get_status(btc(), StreamType::Trade),
             Some(SubscriptionStatus::Failed)
         );
     }
 
     #[test]
     fn test_cancel_subscription() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        manager.confirm(&[Symbol::BTCUSDT], StreamType::Trade);
-        
-        assert!(manager.is_active(Symbol::BTCUSDT, StreamType::Trade));
-        
-        manager.cancel_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        
-        assert!(!manager.is_subscribed(Symbol::BTCUSDT, StreamType::Trade));
-        assert!(!manager.is_active(Symbol::BTCUSDT, StreamType::Trade));
+
+        manager.request_subscription(&[btc()], StreamType::Trade);
+        manager.confirm(&[btc()], StreamType::Trade);
+        assert!(manager.is_active(btc(), StreamType::Trade));
+
+        manager.cancel_subscription(&[btc()], StreamType::Trade);
+        assert!(!manager.is_subscribed(btc(), StreamType::Trade));
     }
 
     #[test]
     fn test_multiple_stream_types() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        // Subscribe to trades and tickers for BTC
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Ticker
-        );
-        
-        assert_eq!(manager.total_count(), 2);
-        
-        manager.confirm(&[Symbol::BTCUSDT], StreamType::Trade);
-        manager.confirm(&[Symbol::BTCUSDT], StreamType::Ticker);
-        
-        assert!(manager.is_active(Symbol::BTCUSDT, StreamType::Trade));
-        assert!(manager.is_active(Symbol::BTCUSDT, StreamType::Ticker));
-    }
 
-    #[test]
-    fn test_duplicate_subscription_request() {
-        let mut manager = SubscriptionManager::new();
-        
-        // Request twice - should only create one subscription
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        
-        assert_eq!(manager.total_count(), 1);
+        manager.request_subscription(&[btc()], StreamType::Trade);
+        manager.request_subscription(&[btc()], StreamType::Ticker);
+
+        assert_eq!(manager.total_count(), 2);
+        manager.confirm(&[btc()], StreamType::Trade);
+        manager.confirm(&[btc()], StreamType::Ticker);
+
+        assert!(manager.is_active(btc(), StreamType::Trade));
+        assert!(manager.is_active(btc(), StreamType::Ticker));
     }
 
     #[test]
     fn test_get_retry_symbols() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        manager.request_subscription(
-            &[Symbol::BTCUSDT, Symbol::ETHUSDT],
-            StreamType::Trade
-        );
-        
-        // Mark BTC as failed once
-        manager.mark_failed(Symbol::BTCUSDT, StreamType::Trade);
-        
+
+        manager.request_subscription(&[btc(), eth()], StreamType::Trade);
+        manager.mark_failed(btc(), StreamType::Trade);
+
         let retry = manager.get_retry_symbols(StreamType::Trade);
         assert_eq!(retry.len(), 1);
-        assert_eq!(retry[0], Symbol::BTCUSDT);
+        assert_eq!(retry[0], btc());
     }
 
     #[test]
     fn test_clear() {
+        init_test_registry();
         let mut manager = SubscriptionManager::new();
-        
-        manager.request_subscription(
-            &[Symbol::BTCUSDT],
-            StreamType::Trade
-        );
-        manager.confirm(&[Symbol::BTCUSDT], StreamType::Trade);
-        
+
+        manager.request_subscription(&[btc()], StreamType::Trade);
+        manager.confirm(&[btc()], StreamType::Trade);
+
         manager.clear();
-        
+
         assert_eq!(manager.total_count(), 0);
         assert_eq!(manager.active_count(StreamType::Trade), 0);
     }

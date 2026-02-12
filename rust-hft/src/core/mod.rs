@@ -20,4 +20,4 @@ pub use fixed_point::FixedPoint8;
 pub use market_data::{Side, TickerData, TradeData};
 pub use registry::{SymbolRegistry, RegistryError, MAX_SYMBOLS};
 pub use symbol::Symbol;
-pub use symbol_map::{SymbolInfo, SymbolMapper};
+pub use symbol_map::SymbolMapper;

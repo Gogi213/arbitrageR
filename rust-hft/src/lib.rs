@@ -10,6 +10,9 @@ pub mod rest;
 pub mod ws;
 pub mod engine;
 
+#[cfg(test)]
+pub mod test_utils;
+
 // Re-export commonly used types
 pub use infrastructure::config::{Config, HftConfig, ApiConfig};
 
