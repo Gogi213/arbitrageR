@@ -2,18 +2,19 @@
 //!
 //! Native WebSocket client for Bybit Futures exchange using V5 API.
 //! Handles public trade and ticker streams.
+//!
+//! HFT: Uses array-based ticker cache for O(1) lookup (no HashMap hashing).
 
-use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper};
+use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper, MAX_SYMBOLS};
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
-use crate::exchanges::parsing::{BybitParser, BybitMessageType, BybitTickerUpdate}; // Add BybitTickerUpdate
+use crate::exchanges::parsing::{BybitParser, BybitMessageType, BybitTickerUpdate};
 use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
 use crate::exchanges::Exchange;
 use crate::{HftError, Result};
 use std::time::Duration;
 use tokio::time::{interval, timeout, Instant};
-use std::collections::HashMap;
 
 /// Bybit Futures WebSocket client (V5 API)
 pub struct BybitWsClient {
@@ -25,10 +26,8 @@ pub struct BybitWsClient {
     monitor: ConnectionMonitor,
     /// Last message timestamp
     last_message: Instant,
-    /// Request ID counter for V5 protocol
-    request_id: u32,
-    /// Local ticker cache for delta merging
-    tickers: HashMap<Symbol, TickerData>,
+    /// Local ticker cache for delta merging (array-based for O(1) lookup)
+    tickers: Box<[Option<TickerData>; MAX_SYMBOLS]>,
 }
 
 impl BybitWsClient {
@@ -44,8 +43,7 @@ impl BybitWsClient {
             subscriptions: SubscriptionManager::new(),
             monitor: ConnectionMonitor::new("bybit".to_string()),
             last_message: Instant::now(),
-            request_id: 0,
-            tickers: HashMap::new(),
+            tickers: Box::new([None; MAX_SYMBOLS]),
         }
     }
     
@@ -56,10 +54,19 @@ impl BybitWsClient {
         client
     }
 
-    /// Merge ticker update into cache and return full ticker
+    /// Merge ticker update into cache and return full ticker (hot path)
+    /// O(1) array lookup by Symbol ID, no hashing
+    #[inline]
     fn merge_ticker(&mut self, update: BybitTickerUpdate) -> Option<TickerData> {
-        // Get or create entry
-        let ticker = self.tickers.entry(update.symbol).or_insert_with(|| TickerData {
+        let id = update.symbol.as_raw() as usize;
+        
+        // Bounds check (should never fail if Symbol IDs are valid)
+        if id >= MAX_SYMBOLS {
+            return None;
+        }
+        
+        // Get or create ticker entry
+        let ticker = self.tickers[id].get_or_insert_with(|| TickerData {
             symbol: update.symbol,
             bid_price: FixedPoint8::ZERO,
             ask_price: FixedPoint8::ZERO,
@@ -68,14 +75,14 @@ impl BybitWsClient {
             timestamp: 0,
         });
         
-        // Update fields
+        // Update fields from delta
         if let Some(p) = update.bid_price { ticker.bid_price = p; }
         if let Some(q) = update.bid_qty { ticker.bid_qty = q; }
         if let Some(p) = update.ask_price { ticker.ask_price = p; }
         if let Some(q) = update.ask_qty { ticker.ask_qty = q; }
         if update.timestamp > ticker.timestamp { ticker.timestamp = update.timestamp; }
         
-        // Return copy if valid (has prices)
+        // Return copy if valid (has both prices)
         if ticker.bid_price.is_positive() && ticker.ask_price.is_positive() {
             Some(*ticker)
         } else {
@@ -432,7 +439,6 @@ mod tests {
     fn test_bybit_client_creation() {
         let client = BybitWsClient::new();
         assert!(!client.is_connected());
-        assert_eq!(client.request_id, 0);
     }
 
     #[test]
