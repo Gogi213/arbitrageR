@@ -1,24 +1,15 @@
 //! Symbol mapping and normalization
-//!
-//! Handles mapping between canonical symbols and exchange-specific formats.
-//! Ensures O(1) lookup and zero allocation.
-
 use crate::core::Symbol;
 use crate::exchanges::Exchange;
 
-/// Symbol mapping information
 #[derive(Debug, Clone, Copy)]
 pub struct SymbolInfo {
-    /// Canonical symbol ID
     pub symbol: Symbol,
-    /// Symbol name on Binance
     pub binance_name: &'static str,
-    /// Symbol name on Bybit
     pub bybit_name: &'static str,
 }
 
 impl SymbolInfo {
-    /// Create new symbol info where names match canonical
     pub const fn new(symbol: Symbol, name: &'static str) -> Self {
         Self {
             symbol,
@@ -26,12 +17,10 @@ impl SymbolInfo {
             bybit_name: name,
         }
     }
-
-    /// Create symbol info with different exchange names
     pub const fn new_mapped(
         symbol: Symbol,
         binance_name: &'static str,
-        bybit_name: &'static str
+        bybit_name: &'static str,
     ) -> Self {
         Self {
             symbol,
@@ -41,9 +30,8 @@ impl SymbolInfo {
     }
 }
 
-/// Static symbol mapping table
-/// TODO: In production this would be generated from config or API
-pub static SYMBOL_MAP: [SymbolInfo; 11] = [
+// Extended symbol map for all predefined symbols
+pub static SYMBOL_MAP: [SymbolInfo; 48] = [
     SymbolInfo::new(Symbol::BTCUSDT, "BTCUSDT"),
     SymbolInfo::new(Symbol::ETHUSDT, "ETHUSDT"),
     SymbolInfo::new(Symbol::SOLUSDT, "SOLUSDT"),
@@ -54,19 +42,53 @@ pub static SYMBOL_MAP: [SymbolInfo; 11] = [
     SymbolInfo::new(Symbol::AVAXUSDT, "AVAXUSDT"),
     SymbolInfo::new(Symbol::TRXUSDT, "TRXUSDT"),
     SymbolInfo::new(Symbol::DOTUSDT, "DOTUSDT"),
-    // Edge case: Canonical PEPEUSDT maps to 1000PEPEUSDT on exchanges
+    // Edge case: PEPEUSDT maps to 1000PEPEUSDT on some exchanges
     SymbolInfo::new_mapped(Symbol::PEPEUSDT, "1000PEPEUSDT", "1000PEPEUSDT"),
+    // Additional symbols (IDs 11-47)
+    SymbolInfo::new(Symbol::TNSRUSDT, "TNSRUSDT"),
+    SymbolInfo::new(Symbol::BERAUSDT, "BERAUSDT"),
+    SymbolInfo::new(Symbol::TRIAUSDT, "TRIAUSDT"),
+    SymbolInfo::new(Symbol::BLESSUSDT, "BLESSUSDT"),
+    SymbolInfo::new(Symbol::DYDXUSDT, "DYDXUSDT"),
+    SymbolInfo::new(Symbol::MYXUSDT, "MYXUSDT"),
+    SymbolInfo::new(Symbol::SKRUSDT, "SKRUSDT"),
+    SymbolInfo::new(Symbol::SONICUSDT, "SONICUSDT"),
+    SymbolInfo::new(Symbol::WIFUSDT, "WIFUSDT"),
+    SymbolInfo::new(Symbol::BONKUSDT, "BONKUSDT"),
+    SymbolInfo::new(Symbol::FLOKIUSDT, "FLOKIUSDT"),
+    SymbolInfo::new(Symbol::LINKUSDT, "LINKUSDT"),
+    SymbolInfo::new(Symbol::UNIUSDT, "UNIUSDT"),
+    SymbolInfo::new(Symbol::AAVEUSDT, "AAVEUSDT"),
+    SymbolInfo::new(Symbol::APTVUSDT, "APTVUSDT"),
+    SymbolInfo::new(Symbol::ARBUSDT, "ARBUSDT"),
+    SymbolInfo::new(Symbol::CATUSDT, "CATUSDT"),
+    SymbolInfo::new(Symbol::ENAUSDT, "ENAUSDT"),
+    SymbolInfo::new(Symbol::GALAUSDT, "GALAUSDT"),
+    SymbolInfo::new(Symbol::GMTUSDT, "GMTUSDT"),
+    SymbolInfo::new(Symbol::INJUSDT, "INJUSDT"),
+    SymbolInfo::new(Symbol::NEARUSDT, "NEARUSDT"),
+    SymbolInfo::new(Symbol::OPUSDT, "OPUSDT"),
+    SymbolInfo::new(Symbol::RNDRUSDT, "RNDRUSDT"),
+    SymbolInfo::new(Symbol::SANDUSDT, "SANDUSDT"),
+    SymbolInfo::new(Symbol::SEIUSDT, "SEIUSDT"),
+    SymbolInfo::new(Symbol::STRKUSDT, "STRKUSDT"),
+    SymbolInfo::new(Symbol::SUIUSDT, "SUIUSDT"),
+    SymbolInfo::new(Symbol::TONUSDT, "TONUSDT"),
+    SymbolInfo::new(Symbol::TURBOUSDT, "TURBOUSDT"),
+    SymbolInfo::new(Symbol::VIRTUALUSDT, "VIRTUALUSDT"),
+    SymbolInfo::new(Symbol::WLDUSDT, "WLDUSDT"),
+    SymbolInfo::new(Symbol::KAITOUSDT, "KAITOUSDT"),
+    SymbolInfo::new(Symbol::LDOUSDT, "LDOUSDT"),
+    SymbolInfo::new(Symbol::LEVERUSDT, "LEVERUSDT"),
+    SymbolInfo::new(Symbol::MEUSDT, "MEUSDT"),
+    SymbolInfo::new(Symbol::PYTHUSDT, "PYTHUSDT"),
 ];
 
-/// Symbol Mapper for normalization
 pub struct SymbolMapper;
 
 impl SymbolMapper {
-    /// Get exchange-specific symbol name
     #[inline]
     pub fn get_name(symbol: Symbol, exchange: Exchange) -> Option<&'static str> {
-        // Linear scan for small static table is faster than HashMap
-        // For 10 items, this is effectively O(1)
         for info in SYMBOL_MAP.iter() {
             if info.symbol == symbol {
                 return Some(match exchange {
@@ -75,32 +97,24 @@ impl SymbolMapper {
                 });
             }
         }
-        
-        // Fallback to Symbol's internal string if not in map
-        // This handles dynamic symbols, assuming they match on exchange
+        // Fallback to Symbol's internal string (for dynamic symbols)
         Some(symbol.as_str())
     }
 
-    /// Parse symbol from exchange-specific string
     #[inline]
     pub fn from_exchange_name(name: &str, exchange: Exchange) -> Option<Symbol> {
-        // Linear scan for mapped names first (e.g. 1000SHIB vs SHIB1000)
-        // This is necessary because Symbol::from_bytes would register "1000SHIB" as a new symbol
-        // instead of mapping it to SHIB
+        // Linear scan for mapped names first
         for info in SYMBOL_MAP.iter() {
             let match_found = match exchange {
                 Exchange::Binance => info.binance_name == name,
                 Exchange::Bybit => info.bybit_name == name,
             };
-            
             if match_found {
                 return Some(info.symbol);
             }
         }
 
         // Fallback: Try standard parsing
-        // This handles standard symbols that match canonical names (e.g. BTCUSDT)
-        // and registers new dynamic symbols if needed
         Symbol::from_bytes(name.as_bytes())
     }
 }
@@ -108,7 +122,6 @@ impl SymbolMapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
     #[test]
     fn test_get_name_binance() {
         assert_eq!(
@@ -116,7 +129,6 @@ mod tests {
             Some("BTCUSDT")
         );
     }
-    
     #[test]
     fn test_get_name_bybit() {
         assert_eq!(
@@ -124,7 +136,6 @@ mod tests {
             Some("ETHUSDT")
         );
     }
-    
     #[test]
     fn test_from_exchange_name() {
         assert_eq!(
@@ -132,34 +143,19 @@ mod tests {
             Some(Symbol::BTCUSDT)
         );
     }
-    
     #[test]
     fn test_edge_case_pepe() {
-        // Canonical is PEPEUSDT
-        // Exchange is 1000PEPEUSDT
-        
-        // Get name
         assert_eq!(
             SymbolMapper::get_name(Symbol::PEPEUSDT, Exchange::Binance),
             Some("1000PEPEUSDT")
         );
-        
-        // From name
         assert_eq!(
             SymbolMapper::from_exchange_name("1000PEPEUSDT", Exchange::Binance),
             Some(Symbol::PEPEUSDT)
         );
-        
-        // Bybit
         assert_eq!(
             SymbolMapper::from_exchange_name("1000PEPEUSDT", Exchange::Bybit),
             Some(Symbol::PEPEUSDT)
         );
     }
 }
-
-// HFT Hot Path Checklist verified:
-// ✓ No heap allocations
-// ✓ Stack-only operations
-// ✓ Linear scan on small static table (cache friendly)
-// ✓ No panics

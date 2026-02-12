@@ -97,8 +97,9 @@ impl BinanceWsClient {
         self.subscriptions.request_subscription(symbols, StreamType::Ticker);
         
         let batches = self.subscriptions.create_batches(StreamType::Ticker);
+        tracing::info!("Subscribing to {} batches of tickers on Binance", batches.len());
         
-        for batch in batches {
+        for (i, batch) in batches.iter().enumerate() {
             let params: Vec<String> = batch.symbols.iter()
                 .map(|s| {
                     let name = SymbolMapper::get_name(*s, Exchange::Binance).unwrap_or(s.as_str());
@@ -112,9 +113,13 @@ impl BinanceWsClient {
                 "id": 1
             });
             
+            tracing::debug!("Binance subscribe batch {}: {} symbols", i, params.len());
+            tracing::trace!("Request: {}", request);
+            
             if let Some(conn) = self.connection.as_mut() {
                 conn.send_text(&request.to_string()).await
                     .map_err(|e| HftError::WebSocket(e.to_string()))?;
+                tracing::debug!("Sent subscription request to Binance");
             }
         }
         
@@ -130,11 +135,22 @@ impl BinanceWsClient {
                         self.last_message = Instant::now();
                         self.monitor.record_activity();
                         
+                        // Log raw message at debug level
+                        if let Ok(text) = msg.to_text() {
+                            tracing::debug!("Binance raw message (first 200 chars): {}", &text[..text.len().min(200)]);
+                        }
+                        
                         // Parse message
                         if let Ok(text) = msg.to_text() {
                             match Self::parse_message(text) {
-                                Ok(Some(parsed)) => return Ok(Some(parsed)),
-                                Ok(None) => continue, // Unknown message, skip
+                                Ok(Some(parsed)) => {
+                                    tracing::debug!("Parsed Binance message: {:?}", parsed);
+                                    return Ok(Some(parsed));
+                                }
+                                Ok(None) => {
+                                    tracing::debug!("Unknown/ignored Binance message");
+                                    continue; // Unknown message, skip
+                                }
                                 Err(e) => {
                                     tracing::warn!("Parse error: {}", e);
                                     continue;
@@ -144,10 +160,12 @@ impl BinanceWsClient {
                     }
                     Ok(None) => {
                         // Connection closed
+                        tracing::warn!("Binance connection closed");
                         self.connection = None;
                         return Ok(None);
                     }
                     Err(e) => {
+                        tracing::error!("Binance WebSocket error: {}", e);
                         return Err(HftError::WebSocket(e.to_string()));
                     }
                 }

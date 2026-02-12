@@ -19,3 +19,4 @@ pub use pool::{ObjectPool, ByteBufferPool, MessageBufferPool};
 pub use ring_buffer::RingBuffer;
 pub use time_window_buffer::TimeWindowBuffer;
 pub use api::start_server;
+pub use logging::init_logging;

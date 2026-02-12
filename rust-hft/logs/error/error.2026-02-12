@@ -1,0 +1,4 @@
+2026-02-12T04:35:17.856169Z ERROR rust_hft::ws::connection: WS Error: WebSocket protocol error: Connection reset without closing handshake
+2026-02-12T04:35:17.856206Z ERROR rust_hft::engine: binance error: WebSocket error: Receive failed: WebSocket protocol error: Connection reset without closing handshake
+2026-02-12T04:35:18.857325Z  WARN rust_hft::ws::connection: WS Stream ended (None)
+2026-02-12T04:35:18.858593Z  WARN rust_hft::engine: binance connection closed gracefully

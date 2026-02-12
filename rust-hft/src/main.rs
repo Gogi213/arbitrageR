@@ -12,13 +12,14 @@
 #![allow(incomplete_features)]
 
 use rust_hft::hot_path::ThresholdTracker;
-use rust_hft::infrastructure::{start_server, metrics::MetricsCollector, config::Config};
+use rust_hft::infrastructure::{start_server, metrics::MetricsCollector, config::Config, logging};
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
 use rust_hft::core::{Symbol, SymbolDiscovery, SymbolRegistry};
 use rust_hft::{HftError, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing_appender::non_blocking::WorkerGuard;
 
 /// Main application state
 pub struct HftApp {
@@ -81,6 +82,7 @@ impl HftApp {
         
         let symbols: Vec<Symbol> = discovered.into_iter()
             .map(|d| d.symbol)
+            .take(200)  // Increased from 50 to 200 symbols
             .collect();
         tracing::info!("Discovered {} liquid symbols", symbols.len());
         
@@ -93,8 +95,9 @@ impl HftApp {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing for cold path logging
-    tracing_subscriber::fmt::init();
+    // Initialize centralized file logging
+    // Guards must be kept alive for the duration of the program
+    let _log_guards: Vec<WorkerGuard> = logging::init_logging();
     
     // Load config or use defaults
     let config = Config::load().unwrap_or_default();

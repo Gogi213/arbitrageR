@@ -86,7 +86,7 @@ fn default_api_port() -> u16 {
 }
 
 fn default_static_path() -> PathBuf {
-    PathBuf::from("./reference/frontend")
+    PathBuf::from("/root/arbitrageR/reference/frontend")
 }
 
 impl Config {
@@ -159,7 +159,7 @@ mod tests {
         assert_eq!(config.api.port, 5000);
         assert_eq!(
             config.api.static_path,
-            PathBuf::from("./reference/frontend")
+            PathBuf::from("/root/arbitrageR/reference/frontend")
         );
     }
 

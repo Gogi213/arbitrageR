@@ -118,10 +118,16 @@ async fn get_dashboard_stats(
     let stats = tracker.get_all_stats();
     let active_symbols = stats.len();
     
+    tracing::info!("Dashboard API: get_all_stats returned {} entries", active_symbols);
+    
     let screeners: Vec<ScreenerDto> = stats
         .into_iter()
         .map(ScreenerDto::from)
         .collect();
+    
+    tracing::info!("Dashboard API returning {} screener entries", screeners.len());
+    
+    tracing::info!("Dashboard API returning {} screener entries", screeners.len());
     
     // Get real metrics from collector
     let metrics_snapshot = state.metrics.snapshot();

@@ -1,0 +1,2 @@
+2026-02-12T04:35:17.856180Z ERROR rust_hft::ws::connection: WS Error: WebSocket protocol error: Connection reset without closing handshake
+2026-02-12T04:35:18.857379Z  WARN rust_hft::ws::connection: WS Stream ended (None)

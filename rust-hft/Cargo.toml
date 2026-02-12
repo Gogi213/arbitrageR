@@ -59,6 +59,7 @@ tower-http = { version = "0.5", features = ["fs", "cors"] }
 # Logging - only for cold path
 tracing = { version = "0.1", default-features = false, features = ["std", "attributes"] }
 tracing-subscriber = { version = "0.3", features = ["fmt", "json", "env-filter", "std"], default-features = false }
+tracing-appender = "0.2"
 
 # Bytes handling - zero-copy
 bytes = { version = "1.10", default-features = false }

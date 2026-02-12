@@ -66,7 +66,7 @@ impl AppEngine {
                 self.metrics.set_bybit_connected(true);
             }
             
-            tracing::info!("Subscribing to tickers on {}...", name);
+            tracing::info!("Subscribing to {} tickers on {}...", symbols.len(), name);
             if let Err(e) = exchange.subscribe_tickers(symbols).await {
                 tracing::error!("Failed to subscribe on {}: {}", name, e);
                 return Err(e);
@@ -129,8 +129,10 @@ impl AppEngine {
         tracing::info!("Engine running. Processing messages...");
         
         while let Some(msg) = rx.recv().await {
+            tracing::debug!("Engine received message: {:?}", msg);
             match msg {
                 ExchangeMessage::Ticker(exchange, ticker) => {
+                    tracing::info!("Ticker received: {:?} from {:?}", ticker, exchange);
                     // Record metrics (cold path - don't block hot path)
                     match exchange {
                         Exchange::Binance => self.metrics.record_binance_message(),
@@ -149,11 +151,15 @@ impl AppEngine {
                                 event.long_ex,
                                 event.short_ex
                             );
+                        } else {
+                            tracing::debug!("Spread updated: {} {:.4}%", event.symbol.as_str(), event.spread.to_f64() * 100.0);
                         }
+                    } else {
+                        tracing::debug!("No arbitrage opportunity for this tick");
                     }
                 }
                 ExchangeMessage::Trade(exchange, _trade) => {
-                    // Record trade message metrics
+                    tracing::debug!("Trade received from {:?}", exchange);
                     match exchange {
                         Exchange::Binance => self.metrics.record_binance_message(),
                         Exchange::Bybit => self.metrics.record_bybit_message(),
@@ -161,6 +167,7 @@ impl AppEngine {
                 }
                 ExchangeMessage::Heartbeat => {
                     // Heartbeat received - connection alive
+                    tracing::debug!("Heartbeat received");
                 }
                 ExchangeMessage::Error(e) => {
                     tracing::error!("Exchange error: [{:?}] {}", e.exchange, e.message);
