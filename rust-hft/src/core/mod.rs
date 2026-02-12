@@ -5,12 +5,15 @@
 //! - Symbol: Interned string for trading pairs
 //! - TickerData: Best bid/ask data
 //! - TradeData: Individual trade information
+//! - SymbolDiscovery: Dynamic symbol loading (cold path)
 
+pub mod discovery;
 pub mod fixed_point;
+pub mod market_data;
 pub mod symbol;
 pub mod symbol_map;
-pub mod market_data;
 
+pub use discovery::{DiscoveredSymbol, DiscoveryError, SymbolDiscovery, DEFAULT_MIN_VOLUME};
 pub use fixed_point::FixedPoint8;
 pub use market_data::{Side, TickerData, TradeData};
 pub use symbol::Symbol;
