@@ -166,11 +166,7 @@ impl WebSocketConnection {
 
         match self.stream.next().await {
             Some(Ok(msg)) => {
-                // tracing::debug!("WS Recv: {:?}", msg);
                 self.last_activity = Instant::now();
-                
-                // ...
-                
                 Ok(Some(msg))
             }
             Some(Err(e)) => {

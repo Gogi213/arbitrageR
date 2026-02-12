@@ -54,7 +54,7 @@ toml = "0.8"
 # Web Server (Cold Path)
 axum = { version = "0.7", features = ["http2", "ws", "macros"] }
 tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.5", features = ["fs", "cors"] }
 
 # Logging - only for cold path
 tracing = { version = "0.1", default-features = false, features = ["std", "attributes"] }
@@ -101,6 +101,14 @@ codegen-units = 16
 [profile.dev-opt]
 inherits = "dev"
 opt-level = 2
+
+# Fast development profile - minimal compile time
+[profile.dev-fast]
+inherits = "dev"
+opt-level = 0
+codegen-units = 16
+lto = false
+incremental = true
 
 [lib]
 name = "rust_hft"
