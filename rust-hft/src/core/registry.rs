@@ -14,12 +14,6 @@ use std::sync::OnceLock;
 /// Maximum number of symbols supported
 pub const MAX_SYMBOLS: usize = 5000;
 
-/// Symbol name storage (leaked to 'static for zero-copy lookup)
-struct SymbolEntry {
-    name: &'static str,
-    id: u32,
-}
-
 /// Global symbol registry
 static SYMBOL_REGISTRY: OnceLock<SymbolRegistry> = OnceLock::new();
 

@@ -171,5 +171,85 @@ pub enum BybitMessageType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // ... existing tests would go here, simplified for brevity ...
+
+    #[test]
+    fn test_detect_public_trade() {
+        let data = b"{\"topic\":\"publicTrade.BTCUSDT\",\"data\":[{\"s\":\"BTCUSDT\",\"p\":\"50000.00\"}]}";
+        assert_eq!(
+            BybitParser::detect_message_type(data),
+            BybitMessageType::PublicTrade
+        );
+    }
+
+    #[test]
+    fn test_detect_ticker() {
+        let data = b"{\"topic\":\"tickers.BTCUSDT\",\"data\":{\"symbol\":\"BTCUSDT\",\"bid1Price\":\"50000.00\"}}";
+        assert_eq!(
+            BybitParser::detect_message_type(data),
+            BybitMessageType::Ticker
+        );
+    }
+
+    #[test]
+    fn test_detect_unknown() {
+        let data = b"{\"unknown\":\"message\"}";
+        assert_eq!(
+            BybitParser::detect_message_type(data),
+            BybitMessageType::Unknown
+        );
+    }
+
+    #[test]
+    fn test_parse_ticker_snapshot() {
+        let data = br#"{"topic":"tickers.BTCUSDT","data":{"symbol":"BTCUSDT","bid1Price":"50000.50","bid1Size":"1.5","ask1Price":"50001.00","ask1Size":"0.8","ts":"1234567890123"}}"#;
+
+        let result = BybitParser::parse_ticker(data);
+        assert!(result.is_some());
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.data.symbol, Symbol::BTCUSDT);
+        // FixedPoint8 stores value * 10^8
+        assert!(parsed.data.bid_price.as_raw() > 0);
+        assert!(parsed.data.ask_price.as_raw() > 0);
+        // Timestamp is parsed as-is from string
+        assert!(parsed.data.timestamp > 0);
+    }
+
+    #[test]
+    fn test_parse_ticker_update_delta() {
+        let data = br#"{"topic":"tickers.BTCUSDT","data":{"symbol":"BTCUSDT","bid1Price":"50000.50","ts":"1234567890123"}}"#;
+
+        let result = BybitParser::parse_ticker_update(data);
+        assert!(result.is_some());
+
+        let parsed = result.unwrap();
+        assert_eq!(parsed.data.symbol, Symbol::BTCUSDT);
+        assert!(parsed.data.bid_price.is_some());
+        assert!(parsed.data.ask_price.is_none()); // Not in delta
+    }
+
+    #[test]
+    fn test_extract_symbol_from_topic() {
+        let data = br#"{"topic":"tickers.BTCUSDT","data":{}}"#;
+        let symbol = BybitParser::extract_symbol_from_topic(data);
+        assert_eq!(symbol, Some(b"BTCUSDT".as_slice()));
+    }
+
+    #[test]
+    fn test_is_public_trade() {
+        let data = b"{\"topic\":\"publicTrade.BTCUSDT\"}";
+        assert!(BybitParser::is_public_trade(data));
+
+        let ticker = b"{\"topic\":\"tickers.BTCUSDT\"}";
+        assert!(!BybitParser::is_public_trade(ticker));
+    }
+
+    #[test]
+    fn test_is_ticker() {
+        let data = b"{\"topic\":\"tickers.BTCUSDT\"}";
+        assert!(BybitParser::is_ticker(data));
+
+        let trade = b"{\"topic\":\"publicTrade.BTCUSDT\"}";
+        assert!(!BybitParser::is_ticker(trade));
+    }
 }
