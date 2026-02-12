@@ -12,11 +12,11 @@
 #![allow(incomplete_features)]
 
 use rust_hft::hot_path::ThresholdTracker;
-use rust_hft::infrastructure::{start_server, metrics::MetricsCollector};
+use rust_hft::infrastructure::{start_server, metrics::MetricsCollector, config::Config};
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
 use rust_hft::core::{Symbol, SymbolDiscovery, SymbolRegistry};
-use rust_hft::Result;
+use rust_hft::{HftError, Result};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -24,12 +24,6 @@ use tokio::sync::RwLock;
 pub struct HftApp {
     /// Configuration (read-heavy, rarely changed)
     config: Arc<RwLock<Config>>,
-}
-
-/// Application configuration
-#[derive(Debug, Clone)]
-pub struct Config {
-    pub api_port: u16,
 }
 
 impl HftApp {
@@ -51,11 +45,12 @@ impl HftApp {
         // 2. Start API Server (Cold Path)
         let tracker_for_api = tracker.clone();
         let metrics_for_api = metrics.clone();
-        let config = self.config.read().await;
-        let port = config.api_port;
+        let config_guard = self.config.read().await;
+        let api_config = config_guard.api.clone();
+        drop(config_guard); // Release lock early
         
         tokio::spawn(async move {
-            if let Err(e) = start_server(tracker_for_api, metrics_for_api, port).await {
+            if let Err(e) = start_server(tracker_for_api, metrics_for_api, &api_config).await {
                 tracing::error!("API Server failed: {}", e);
             }
         });
@@ -68,78 +63,26 @@ impl HftApp {
         engine.add_exchange(ExchangeClient::Bybit(BybitWsClient::new()));
         
         // 4. Discover liquid symbols dynamically (Cold Path - startup only)
-        println!("DEBUG: Starting discovery...");
         tracing::info!("Discovering liquid symbols from exchanges...");
         
-        let symbols = if !SymbolRegistry::is_initialized() {
-            // Step 1: Fetch symbol names only (without parsing)
-            println!("DEBUG: Registry not initialized, creating discovery...");
-            let discovery = SymbolDiscovery::new();
-            println!("DEBUG: Fetching symbol names...");
-            match discovery.fetch_symbol_names().await {
-                Ok(names) => {
-                    println!("DEBUG: Fetched {} symbol names", names.len());
-                    tracing::info!("Fetched {} symbol names", names.len());
-                    
-                    // Step 2: Register symbols in global registry
-                    if let Err(e) = SymbolRegistry::initialize(&names) {
-                        tracing::warn!("Failed to initialize symbol registry: {}. Using fallback.", e);
-                        vec![
-                            Symbol::BTCUSDT,
-                            Symbol::ETHUSDT,
-                            Symbol::SOLUSDT,
-                            Symbol::BNBUSDT,
-                            Symbol::XRPUSDT,
-                        ]
-                    } else {
-                        // Step 3: Now fetch full data with registered symbols
-                        match discovery.fetch_all_liquid().await {
-                            Ok(discovered) => {
-                                let symbols: Vec<Symbol> = discovered.into_iter()
-                                    .map(|d| d.symbol)
-                                    .collect();
-                                tracing::info!("Discovered {} liquid symbols after registration", symbols.len());
-                                symbols
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to fetch liquid symbols: {}. Using fallback.", e);
-                                vec![
-                                    Symbol::BTCUSDT,
-                                    Symbol::ETHUSDT,
-                                    Symbol::SOLUSDT,
-                                    Symbol::BNBUSDT,
-                                    Symbol::XRPUSDT,
-                                ]
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to fetch symbol names: {}. Using fallback.", e);
-                    // Fallback to major pairs
-                    vec![
-                        Symbol::BTCUSDT,
-                        Symbol::ETHUSDT,
-                        Symbol::SOLUSDT,
-                        Symbol::BNBUSDT,
-                        Symbol::XRPUSDT,
-                    ]
-                }
-            }
-        } else {
-            // Registry already initialized
-            let discovery = SymbolDiscovery::new();
-            match discovery.fetch_all_liquid().await {
-                Ok(discovered) => discovered.into_iter().map(|d| d.symbol).collect(),
-                Err(_) => vec![
-                    Symbol::BTCUSDT,
-                    Symbol::ETHUSDT,
-                    Symbol::SOLUSDT,
-                    Symbol::BNBUSDT,
-                    Symbol::XRPUSDT,
-                ],
-            }
-        };
+        // Step 1: Fetch symbol names
+        let discovery = SymbolDiscovery::new();
+        let names = discovery.fetch_symbol_names().await
+            .map_err(|e| HftError::RestApi(format!("Failed to fetch symbol names: {}", e)))?;
+        tracing::info!("Fetched {} symbol names", names.len());
+        
+        // Step 2: Register symbols in global registry
+        SymbolRegistry::initialize(&names)
+            .map_err(|e| HftError::Config(format!("Failed to initialize symbol registry: {}", e)))?;
+        
+        // Step 3: Fetch full data with registered symbols
+        let discovered = discovery.fetch_all_liquid().await
+            .map_err(|e| HftError::RestApi(format!("Failed to fetch liquid symbols: {}", e)))?;
+        
+        let symbols: Vec<Symbol> = discovered.into_iter()
+            .map(|d| d.symbol)
+            .collect();
+        tracing::info!("Discovered {} liquid symbols", symbols.len());
         
         // Run engine (this blocks the task)
         engine.run(&symbols).await?;
@@ -153,10 +96,8 @@ async fn main() -> Result<()> {
     // Initialize tracing for cold path logging
     tracing_subscriber::fmt::init();
     
-    // TODO: Load config from file
-    let config = Config {
-        api_port: 5000,
-    };
+    // Load config or use defaults
+    let config = Config::load().unwrap_or_default();
     
     let app = HftApp::new(config).await?;
     app.run().await?;

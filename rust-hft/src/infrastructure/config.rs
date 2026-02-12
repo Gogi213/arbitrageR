@@ -32,6 +32,10 @@ pub struct HftConfig {
     /// 250_000 = 0.25% spread between exchanges
     #[serde(default = "default_threshold")]
     pub opportunity_threshold_bps: i64,
+
+    /// Rolling window duration in seconds for spread history
+    #[serde(default = "default_window_seconds")]
+    pub window_seconds: u64,
 }
 
 /// API server configuration
@@ -51,6 +55,7 @@ impl Default for HftConfig {
         Self {
             min_volume_24h: default_min_volume(),
             opportunity_threshold_bps: default_threshold(),
+            window_seconds: default_window_seconds(),
         }
     }
 }
@@ -70,6 +75,10 @@ fn default_min_volume() -> f64 {
 
 fn default_threshold() -> i64 {
     250_000 // 0.25% in FixedPoint8
+}
+
+fn default_window_seconds() -> u64 {
+    120 // 2 minutes
 }
 
 fn default_api_port() -> u16 {

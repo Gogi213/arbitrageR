@@ -17,7 +17,9 @@ use tower_http::services::ServeDir;
 
 use crate::hot_path::{ScreenerStats, ThresholdTracker};
 use crate::infrastructure::metrics::MetricsCollector;
+use crate::infrastructure::config::ApiConfig;
 use crate::HftError;
+use std::path::PathBuf;
 
 /// System status information
 #[derive(Debug, Serialize)]
@@ -74,13 +76,12 @@ pub struct AppState {
 pub async fn start_server(
     tracker: Arc<RwLock<ThresholdTracker>>,
     metrics: Arc<MetricsCollector>,
-    port: u16
+    api_config: &ApiConfig
 ) -> Result<(), HftError> {
     let state = AppState { tracker, metrics };
 
-    // Static files service (from reference/frontend)
-    // TODO: Use config for static path (Phase 6.5)
-    let static_files = ServeDir::new("/root/arbitrageR/reference/frontend");
+    // Static files service from config
+    let static_files = ServeDir::new(&api_config.static_path);
 
     let app = Router::new()
         // API Endpoints
@@ -94,7 +95,7 @@ pub async fn start_server(
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], api_config.port));
     tracing::info!("API Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await
