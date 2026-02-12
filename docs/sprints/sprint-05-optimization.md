@@ -119,22 +119,23 @@ fn get_or_create(&mut self, symbol: Symbol) -> &mut SymbolState {
 **Stack Size Impact:** 2 arrays × 10,000 × 8 bytes = 160KB moved from stack to heap per router instance
 
 ### Phase 5.6: Configuration System
-**Status:** PENDING
+**Status:** COMPLETE
 **Objective:** Make hardcoded values configurable.
 
-- [ ] Create `Config` struct with:
+- [x] Create `Config` struct with:
   - `min_volume_24h: f64` (default: 1_000_000.0)
   - `opportunity_threshold_bps: i64` (default: 250_000)  // 0.25% = 250_000 in FixedPoint8
   - `static_files_path: PathBuf`
   - `api_port: u16`
-- [ ] Load from `config.toml` at startup
-- [ ] Pass to all components
+- [x] Load from `config.toml` at startup
+- [x] Export Config from lib.rs
+- [x] Update tracker.rs threshold from 50_000 to 250_000
 
 **config.toml:**
 ```toml
 [hft]
-min_volume_24h = 1_000_000.0
-opportunity_threshold_bps = 50_000
+min_volume_24h = 1000000.0
+opportunity_threshold_bps = 250000
 
 [api]
 port = 5000
