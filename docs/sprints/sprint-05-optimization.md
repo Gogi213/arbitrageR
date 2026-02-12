@@ -151,12 +151,15 @@ static_path = "./reference/frontend"
 - [x] Remove unused `SymbolEntry` struct from `registry.rs`
 - [x] Add Bybit parser tests (9 new tests)
 - [x] All 120 tests passing
+- [x] **HOTFIX:** Integrate SymbolDiscovery in main.rs (remove hardcoded whitelist)
 
 **Cleanup Summary:**
 - Removed dead code (SymbolEntry, unused imports)
 - Fixed unused variable warnings
 - Added comprehensive Bybit parser test coverage
 - Verified no compiler errors
+- **Removed hardcoded 11-symbol whitelist from main.rs**
+- **Integrated dynamic symbol discovery (loads ~200 liquid pairs)**
 
 ## HFT Hot Path Checklist
 
