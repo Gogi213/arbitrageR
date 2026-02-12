@@ -111,7 +111,9 @@ pub async fn start_server(
 async fn get_dashboard_stats(
     State(state): State<AppState>
 ) -> Json<DashboardDto> {
-    let tracker = state.tracker.read().await;
+    // Note: Using write lock because get_all_stats needs to evict old entries
+    // This is acceptable because API is cold path
+    let mut tracker = state.tracker.write().await;
     let stats = tracker.get_all_stats();
     let active_symbols = stats.len();
     
@@ -142,7 +144,8 @@ async fn get_dashboard_stats(
 async fn get_screener_stats(
     State(state): State<AppState>
 ) -> Json<Vec<ScreenerDto>> {
-    let tracker = state.tracker.read().await;
+    // Note: Using write lock because get_all_stats needs to evict old entries
+    let mut tracker = state.tracker.write().await;
     let stats = tracker.get_all_stats();
     
     let dtos: Vec<ScreenerDto> = stats
