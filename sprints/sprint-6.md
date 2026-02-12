@@ -126,7 +126,7 @@
 | 6.1 | COMPLETE | 668a02b |
 | 6.2 | COMPLETE | 3a85a5a |
 | 6.3 | COMPLETE | ad5fd70 |
-| 6.4 | PENDING | - |
+| 6.4 | COMPLETE | 65c3ef7 |
 | 6.5 | PENDING | - |
 
 **Last Updated:** 2026-02-12
