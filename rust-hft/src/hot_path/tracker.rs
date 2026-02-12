@@ -55,8 +55,8 @@ impl SymbolState {
                 self.current_spread = event.spread;
                 self.history.push_fp(event.spread);
 
-                // Simple hit counting (threshold > 0.05%)
-                if event.spread.as_raw() > 50_000 {
+                // Simple hit counting (threshold > 0.25%)
+                if event.spread.as_raw() > 250_000 {
                     self.hits += 1;
                 }
 

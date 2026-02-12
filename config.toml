@@ -1,0 +1,7 @@
+[hft]
+min_volume_24h = 1000000.0
+opportunity_threshold_bps = 250000
+
+[api]
+port = 5000
+static_path = "./reference/frontend"

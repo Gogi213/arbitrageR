@@ -10,6 +10,9 @@ pub mod rest;
 pub mod ws;
 pub mod engine;
 
+// Re-export commonly used types
+pub use infrastructure::config::{Config, HftConfig, ApiConfig};
+
 use thiserror::Error;
 
 /// Main error type for the HFT bot

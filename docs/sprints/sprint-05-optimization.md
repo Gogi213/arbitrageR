@@ -124,7 +124,7 @@ fn get_or_create(&mut self, symbol: Symbol) -> &mut SymbolState {
 
 - [ ] Create `Config` struct with:
   - `min_volume_24h: f64` (default: 1_000_000.0)
-  - `opportunity_threshold_bps: i64` (default: 50_000)
+  - `opportunity_threshold_bps: i64` (default: 250_000)  // 0.25% = 250_000 in FixedPoint8
   - `static_files_path: PathBuf`
   - `api_port: u16`
 - [ ] Load from `config.toml` at startup
