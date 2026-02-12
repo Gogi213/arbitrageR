@@ -15,22 +15,22 @@
 - Различные magic numbers по всему коду
 
 ### Tasks
-- [ ] Удалить все 3 fallback блока (vec![Symbol::BTCUSDT, ...])
-- [ ] Сделать так чтобы бот падал при ошибке инициализации
-- [ ] Добавить правильную обработку ошибок вместо fallback
-- [ ] Найти и вынести в config все хардкод значения:
+- [x] Удалить все 3 fallback блока (vec![Symbol::BTCUSDT, ...])
+- [x] Сделать так чтобы бот падал при ошибке инициализации
+- [x] Добавить правильную обработку ошибок вместо fallback
+- [x] Найти и вынести в config все хардкод значения:
   - Threshold 0.25% (250_000)
   - Window duration 2 minutes
   - API port 5000
   - Пути к static files
 
 ### Acceptance Criteria
-- [ ] Нет fallback списка из 10 символов
-- [ ] Нет хардкод путей
-- [ ] Нет magic numbers
-- [ ] Все конфигурируемые значения в Config
-- [ ] При ошибке discovery бот останавливается с понятной ошибкой
-- [ ] 277 символов из discovery используются всегда
+- [x] Нет fallback списка из 10 символов
+- [x] Нет хардкод путей
+- [x] Нет magic numbers
+- [x] Все конфигурируемые значения в Config
+- [x] При ошибке discovery бот останавливается с понятной ошибкой
+- [x] 277 символов из discovery используются всегда
 
 ---
 
@@ -113,6 +113,16 @@ let static_files = ServeDir::new("/root/arbitrageR/reference/frontend");
 ### Acceptance Criteria
 - [ ] Единый Error enum для всего проекта
 - [ ] Нет `Result<T, String>`
+
+## Sprint Status
+
+| Phase | Status | Commit |
+|-------|--------|--------|
+| 7.1 | COMPLETE | ff03ad9 |
+| 7.2 | PENDING | - |
+| 7.3 | PENDING | - |
+| 7.4 | PENDING | - |
+| 7.5 | PENDING | - |
 
 ---
 
