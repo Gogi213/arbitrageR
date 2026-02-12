@@ -3,13 +3,11 @@
 //! Manages multiple WebSocket connections with automatic reconnection,
 //! health monitoring, and load balancing.
 
-use crate::ws::connection::{WebSocketConnection, ConnectionState, WebSocketError};
+use crate::ws::connection::{WebSocketConnection, ConnectionState};
 use crate::HftError;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
+use tokio::time::sleep;
 
 /// Connection identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

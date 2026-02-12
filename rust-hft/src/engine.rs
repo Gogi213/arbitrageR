@@ -6,7 +6,7 @@
 use crate::core::Symbol;
 use crate::exchanges::{ExchangeClient, ExchangeMessage};
 use crate::hot_path::ThresholdTracker;
-use crate::{HftError, Result};
+use crate::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

@@ -4,7 +4,6 @@
 //! Tracks pending and active subscriptions, handles confirmations and retries.
 
 use crate::core::Symbol;
-use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use std::collections::{HashMap, HashSet};
 
 /// Maximum symbols per subscription batch (Binance limit)

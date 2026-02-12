@@ -11,7 +11,7 @@ pub use parsing::{BinanceParser, BybitParser};
 pub use traits::{AnyExchange, ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
 
 use crate::core::Symbol;
-use crate::{HftError, Result};
+use crate::Result;
 
 /// Enum dispatch for exchange clients
 /// Provides static dispatch performance with polymorphic interface

@@ -5,17 +5,16 @@
 
 use axum::{
     extract::State,
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
-use crate::core::Symbol;
 use crate::hot_path::{ScreenerStats, ThresholdTracker};
 use crate::HftError;
 

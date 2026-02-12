@@ -9,7 +9,6 @@
 //!
 //! Hot Path: from_bytes() does O(1) lookup, no locks, no allocation
 
-use std::sync::atomic::{AtomicU32, Ordering};
 
 /// Trading pair symbol (interned)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

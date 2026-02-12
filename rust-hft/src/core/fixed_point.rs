@@ -240,7 +240,7 @@ impl FixedPoint8 {
             return 0;
         }
 
-        let mut n = self.0.abs();
+        let n = self.0.abs();
         let negative = self.0 < 0;
 
         // Integer part

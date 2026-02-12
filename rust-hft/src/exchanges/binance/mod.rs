@@ -3,17 +3,16 @@
 //! Native WebSocket client for Binance Futures exchange.
 //! Handles aggTrade and bookTicker streams.
 
-use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper};
-use crate::ws::connection::{WebSocketConnection, WebSocketError};
+use crate::core::{Symbol, TickerData, TradeData, SymbolMapper};
+use crate::ws::connection::WebSocketConnection;
 use crate::ws::subscription::{StreamType, SubscriptionManager};
-use crate::ws::ping::{PingHandler, ConnectionMonitor};
+use crate::ws::ping::ConnectionMonitor;
 use crate::exchanges::parsing::{BinanceParser, BinanceMessageType};
-use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
+use crate::exchanges::traits::{ExchangeMessage, WebSocketExchange};
 use crate::exchanges::Exchange;
 use crate::{HftError, Result};
 
-use std::time::Duration;
-use tokio::time::{interval, Instant};
+use tokio::time::Instant;
 
 /// Binance Futures WebSocket client
 pub struct BinanceWsClient {
@@ -43,7 +42,7 @@ impl BinanceWsClient {
 
     /// Connect to Binance WebSocket
     pub async fn connect(&mut self) -> Result<()> {
-        let mut conn = WebSocketConnection::connect(Self::WS_URL)
+        let conn = WebSocketConnection::connect(Self::WS_URL)
             .await
             .map_err(|e| HftError::WebSocket(e.to_string()))?;
         

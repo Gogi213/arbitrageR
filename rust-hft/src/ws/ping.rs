@@ -8,7 +8,7 @@ use crate::ws::connection::{WebSocketConnection, ConnectionState, WebSocketError
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::time::{interval, sleep, timeout};
+use tokio::time::{interval, sleep};
 
 /// Ping/Pong handler for connection keep-alive
 pub struct PingHandler {

@@ -5,16 +5,16 @@
 //!
 //! HFT: Uses array-based ticker cache for O(1) lookup (no HashMap hashing).
 
-use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper, MAX_SYMBOLS};
-use crate::ws::connection::{WebSocketConnection, WebSocketError};
+use crate::core::{FixedPoint8, Symbol, TickerData, TradeData, SymbolMapper, MAX_SYMBOLS};
+use crate::ws::connection::WebSocketConnection;
 use crate::ws::subscription::{StreamType, SubscriptionManager};
-use crate::ws::ping::{PingHandler, ConnectionMonitor};
+use crate::ws::ping::ConnectionMonitor;
 use crate::exchanges::parsing::{BybitParser, BybitMessageType, BybitTickerUpdate};
 use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
 use crate::exchanges::Exchange;
 use crate::{HftError, Result};
 use std::time::Duration;
-use tokio::time::{interval, timeout, Instant};
+use tokio::time::{timeout, Instant};
 
 /// Bybit Futures WebSocket client (V5 API)
 pub struct BybitWsClient {
@@ -94,7 +94,7 @@ impl BybitWsClient {
     pub async fn connect(&mut self, testnet: bool) -> Result<()> {
         let url = if testnet { Self::WS_URL_TESTNET } else { Self::WS_URL };
         
-        let mut conn = WebSocketConnection::connect(url)
+        let conn = WebSocketConnection::connect(url)
             .await
             .map_err(|e| HftError::WebSocket(e.to_string()))?;
         

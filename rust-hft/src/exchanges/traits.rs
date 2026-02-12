@@ -5,7 +5,7 @@
 
 use crate::core::{Symbol, TickerData, TradeData};
 use crate::exchanges::Exchange;
-use crate::{HftError, Result};
+use crate::Result;
 
 /// Unified message type from any exchange
 /// Copy type for zero-allocation hot path

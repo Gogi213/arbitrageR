@@ -4,7 +4,6 @@
 //! O(1) performance with no HashMap and no allocation in hot path.
 
 use crate::core::{Symbol, TickerData, TradeData};
-use crate::HftError;
 
 /// Maximum number of symbols that can be registered
 /// Should match Symbol::MAX_SYMBOLS
