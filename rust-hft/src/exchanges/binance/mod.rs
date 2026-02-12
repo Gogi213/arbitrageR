@@ -132,7 +132,7 @@ impl BinanceWsClient {
                         
                         // Parse message
                         if let Ok(text) = msg.to_text() {
-                            match Self::parse_message_static(text) {
+                            match Self::parse_message(text) {
                                 Ok(Some(parsed)) => return Ok(Some(parsed)),
                                 Ok(None) => continue, // Unknown message, skip
                                 Err(e) => {
@@ -157,8 +157,8 @@ impl BinanceWsClient {
         Ok(None)
     }
 
-    /// Parse Binance message into structured data (static version)
-    fn parse_message_static(
+    /// Parse Binance message into structured data
+    fn parse_message(
         text: &str,
     ) -> Result<Option<BinanceMessage>> {
         let data = text.as_bytes();
@@ -185,14 +185,6 @@ impl BinanceWsClient {
                 Ok(None)
             }
         }
-    }
-
-    /// Parse Binance message into structured data (instance version wrapper)
-    fn parse_message(
-        &mut self,
-        text: &str,
-    ) -> Result<Option<BinanceMessage>> {
-        Self::parse_message_static(text)
     }
 
     /// Check if connected

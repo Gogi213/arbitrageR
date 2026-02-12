@@ -231,7 +231,6 @@ pub struct ConnectionHealth {
 /// Heartbeat manager for multiple connections
 pub struct HeartbeatManager {
     monitors: Vec<ConnectionMonitor>,
-    unhealthy_threshold: u32,
 }
 
 impl HeartbeatManager {
@@ -239,7 +238,6 @@ impl HeartbeatManager {
     pub fn new() -> Self {
         Self {
             monitors: Vec::new(),
-            unhealthy_threshold: 3,
         }
     }
 

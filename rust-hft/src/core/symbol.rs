@@ -9,7 +9,6 @@
 //!
 //! Hot Path: from_bytes() does O(1) lookup, no locks, no allocation
 
-
 /// Trading pair symbol (interned)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
@@ -195,9 +194,6 @@ mod tests {
         assert!(Symbol::BTCUSDT.is_valid());
     }
 }
-
-// Number of pre-defined static symbols (IDs 0-10)
-const STATIC_SYMBOL_COUNT: u32 = 11;
 
 // HFT Hot Path Checklist verified:
 // ✓ No heap allocations (all stack-based)

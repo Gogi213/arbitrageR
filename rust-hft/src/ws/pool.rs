@@ -59,12 +59,10 @@ struct ManagedConnection {
     reconnect_count: u64,
     /// Current reconnect delay
     current_reconnect_delay: Duration,
-    /// Connection ID
-    id: ConnectionId,
 }
 
 impl ManagedConnection {
-    fn new(id: ConnectionId, config: ConnectionConfig) -> Self {
+    fn new(config: ConnectionConfig) -> Self {
         Self {
             connection: None,
             config,
@@ -73,7 +71,6 @@ impl ManagedConnection {
             last_activity: Instant::now(),
             reconnect_count: 0,
             current_reconnect_delay: Duration::from_secs(1),
-            id,
         }
     }
 
@@ -138,7 +135,7 @@ impl ConnectionPool {
         let id = ConnectionId(self.next_id);
         self.next_id += 1;
 
-        let managed = ManagedConnection::new(id, config);
+        let managed = ManagedConnection::new(config);
         self.connections.insert(id, managed);
 
         id

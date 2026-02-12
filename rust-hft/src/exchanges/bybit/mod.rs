@@ -219,7 +219,7 @@ impl BybitWsClient {
                         self.monitor.record_activity();
                         
                         if let Ok(text) = msg.to_text() {
-                            match Self::parse_message_static(text) {
+                            match Self::parse_message(text) {
                                 Ok(Some(parsed)) => return Ok(Some(parsed)),
                                 Ok(None) => {
                                     tracing::debug!("Ignored Bybit msg: {}", text);
@@ -250,8 +250,8 @@ impl BybitWsClient {
         Ok(None)
     }
 
-    /// Parse Bybit V5 message (static)
-    fn parse_message_static(text: &str) -> Result<Option<BybitMessage>> {
+    /// Parse Bybit V5 message
+    fn parse_message(text: &str) -> Result<Option<BybitMessage>> {
         let data = text.as_bytes();
 
         // Detect message type and parse accordingly
@@ -279,11 +279,6 @@ impl BybitWsClient {
                 Ok(None)
             }
         }
-    }
-
-    /// Parse Bybit V5 message
-    fn parse_message(&mut self, text: &str) -> Result<Option<BybitMessage>> {
-        Self::parse_message_static(text)
     }
 
     /// Check if connected
