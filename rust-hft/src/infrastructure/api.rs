@@ -16,6 +16,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
 use crate::hot_path::{ScreenerStats, ThresholdTracker};
+use crate::infrastructure::metrics::MetricsCollector;
 use crate::HftError;
 
 /// System status information
@@ -66,14 +67,16 @@ impl From<ScreenerStats> for ScreenerDto {
 #[derive(Clone)]
 pub struct AppState {
     pub tracker: Arc<RwLock<ThresholdTracker>>,
+    pub metrics: Arc<MetricsCollector>,
 }
 
 /// Start the API server
 pub async fn start_server(
     tracker: Arc<RwLock<ThresholdTracker>>,
+    metrics: Arc<MetricsCollector>,
     port: u16
 ) -> Result<(), HftError> {
-    let state = AppState { tracker };
+    let state = AppState { tracker, metrics };
 
     // Static files service (from reference/frontend)
     // TODO: Use config for static path (Phase 6.5)
@@ -117,13 +120,15 @@ async fn get_dashboard_stats(
         .map(ScreenerDto::from)
         .collect();
     
-    // TODO: Get actual connection status from AppEngine (Phase 6.2)
+    // Get real metrics from collector
+    let metrics_snapshot = state.metrics.snapshot();
+    
     let system = SystemStatusDto {
-        is_connected: active_symbols > 0,
-        latency_ms: 0, // TODO: Track latency
+        is_connected: state.metrics.is_connected(),
+        latency_ms: state.metrics.latency_ms(),
         active_symbols,
-        binance_connected: active_symbols > 0, // TODO: Actual status
-        bybit_connected: active_symbols > 0,   // TODO: Actual status
+        binance_connected: metrics_snapshot.binance_connected,
+        bybit_connected: metrics_snapshot.bybit_connected,
     };
     
     Json(DashboardDto {

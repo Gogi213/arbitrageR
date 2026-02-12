@@ -4,8 +4,9 @@
 //! Connects Hot Path (exchanges) to Warm Path (tracker) and Cold Path (API).
 
 use crate::core::Symbol;
-use crate::exchanges::{ExchangeClient, ExchangeMessage};
+use crate::exchanges::{ExchangeClient, ExchangeMessage, Exchange};
 use crate::hot_path::ThresholdTracker;
+use crate::infrastructure::metrics::MetricsCollector;
 use crate::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -13,18 +14,25 @@ use tokio::sync::RwLock;
 /// Main engine managing the trading lifecycle
 pub struct AppEngine {
     tracker: Arc<RwLock<ThresholdTracker>>,
+    metrics: Arc<MetricsCollector>,
     exchanges: Vec<ExchangeClient>,
     running: bool,
 }
 
 impl AppEngine {
-    /// Create new engine with shared tracker
-    pub fn new(tracker: Arc<RwLock<ThresholdTracker>>) -> Self {
+    /// Create new engine with shared tracker and metrics
+    pub fn new(tracker: Arc<RwLock<ThresholdTracker>>, metrics: Arc<MetricsCollector>) -> Self {
         Self {
             tracker,
+            metrics,
             exchanges: Vec::new(),
             running: false,
         }
+    }
+
+    /// Get metrics collector reference
+    pub fn metrics(&self) -> Arc<MetricsCollector> {
+        self.metrics.clone()
     }
 
     /// Add exchange client
@@ -48,9 +56,14 @@ impl AppEngine {
             
             if let Err(e) = exchange.connect().await {
                 tracing::error!("Failed to connect to {}: {}", name, e);
-                // Continue with other exchanges? Or fail?
-                // For now, fail fast
                 return Err(e);
+            }
+            
+            // Update connection status in metrics
+            if name == "binance" {
+                self.metrics.set_binance_connected(true);
+            } else if name == "bybit" {
+                self.metrics.set_bybit_connected(true);
             }
             
             tracing::info!("Subscribing to tickers on {}...", name);
@@ -118,9 +131,13 @@ impl AppEngine {
         while let Some(msg) = rx.recv().await {
             match msg {
                 ExchangeMessage::Ticker(exchange, ticker) => {
-                    tracing::info!("Tick: {:?} {}", exchange, ticker.symbol.as_str());
+                    // Record metrics (cold path - don't block hot path)
+                    match exchange {
+                        Exchange::Binance => self.metrics.record_binance_message(),
+                        Exchange::Bybit => self.metrics.record_bybit_message(),
+                    }
+                    
                     // Update tracker (Warm Path)
-                    // Write lock is held only for the duration of the update (nanoseconds)
                     let mut tracker = self.tracker.write().await;
                     if let Some(event) = tracker.update(ticker, exchange) {
                         // Log significant spreads
@@ -135,11 +152,15 @@ impl AppEngine {
                         }
                     }
                 }
-                ExchangeMessage::Trade(exchange, trade) => {
-                    // Trades can be used for more advanced signals later
+                ExchangeMessage::Trade(exchange, _trade) => {
+                    // Record trade message metrics
+                    match exchange {
+                        Exchange::Binance => self.metrics.record_binance_message(),
+                        Exchange::Bybit => self.metrics.record_bybit_message(),
+                    }
                 }
                 ExchangeMessage::Heartbeat => {
-                    // Trace?
+                    // Heartbeat received - connection alive
                 }
                 ExchangeMessage::Error(e) => {
                     tracing::error!("Exchange error: [{:?}] {}", e.exchange, e.message);

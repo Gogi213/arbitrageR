@@ -12,7 +12,7 @@
 #![allow(incomplete_features)]
 
 use rust_hft::hot_path::ThresholdTracker;
-use rust_hft::infrastructure::start_server;
+use rust_hft::infrastructure::{start_server, metrics::MetricsCollector};
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
 use rust_hft::core::{Symbol, SymbolDiscovery, SymbolRegistry};
@@ -46,20 +46,22 @@ impl HftApp {
         
         // 1. Initialize Core Components
         let tracker = Arc::new(RwLock::new(ThresholdTracker::new()));
+        let metrics = Arc::new(MetricsCollector::new());
         
         // 2. Start API Server (Cold Path)
         let tracker_for_api = tracker.clone();
+        let metrics_for_api = metrics.clone();
         let config = self.config.read().await;
         let port = config.api_port;
         
         tokio::spawn(async move {
-            if let Err(e) = start_server(tracker_for_api, port).await {
+            if let Err(e) = start_server(tracker_for_api, metrics_for_api, port).await {
                 tracing::error!("API Server failed: {}", e);
             }
         });
         
         // 3. Start AppEngine (Hot Path)
-        let mut engine = AppEngine::new(tracker.clone());
+        let mut engine = AppEngine::new(tracker.clone(), metrics.clone());
         
         // Add exchanges
         engine.add_exchange(ExchangeClient::Binance(BinanceWsClient::new()));
