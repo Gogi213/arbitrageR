@@ -118,6 +118,7 @@ impl AppEngine {
         while let Some(msg) = rx.recv().await {
             match msg {
                 ExchangeMessage::Ticker(exchange, ticker) => {
+                    tracing::info!("Tick: {:?} {}", exchange, ticker.symbol.as_str());
                     // Update tracker (Warm Path)
                     // Write lock is held only for the duration of the update (nanoseconds)
                     let mut tracker = self.tracker.write().await;

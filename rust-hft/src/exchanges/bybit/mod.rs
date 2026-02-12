@@ -7,12 +7,13 @@ use crate::core::{FixedPoint8, Side, Symbol, TickerData, TradeData, SymbolMapper
 use crate::ws::connection::{WebSocketConnection, WebSocketError};
 use crate::ws::subscription::{StreamType, SubscriptionManager};
 use crate::ws::ping::{PingHandler, ConnectionMonitor};
-use crate::exchanges::parsing::{BybitParser, BybitMessageType};
+use crate::exchanges::parsing::{BybitParser, BybitMessageType, BybitTickerUpdate}; // Add BybitTickerUpdate
 use crate::exchanges::traits::{ErrorKind, ExchangeError, ExchangeMessage, WebSocketExchange};
 use crate::exchanges::Exchange;
 use crate::{HftError, Result};
 use std::time::Duration;
-use tokio::time::{interval, Instant};
+use tokio::time::{interval, timeout, Instant};
+use std::collections::HashMap;
 
 /// Bybit Futures WebSocket client (V5 API)
 pub struct BybitWsClient {
@@ -26,6 +27,8 @@ pub struct BybitWsClient {
     last_message: Instant,
     /// Request ID counter for V5 protocol
     request_id: u32,
+    /// Local ticker cache for delta merging
+    tickers: HashMap<Symbol, TickerData>,
 }
 
 impl BybitWsClient {
@@ -42,14 +45,42 @@ impl BybitWsClient {
             monitor: ConnectionMonitor::new("bybit".to_string()),
             last_message: Instant::now(),
             request_id: 0,
+            tickers: HashMap::new(),
         }
     }
-
+    
     /// Create new Bybit client for testnet
     pub fn new_testnet() -> Self {
         let mut client = Self::new();
         client.monitor = ConnectionMonitor::new("bybit-testnet".to_string());
         client
+    }
+
+    /// Merge ticker update into cache and return full ticker
+    fn merge_ticker(&mut self, update: BybitTickerUpdate) -> Option<TickerData> {
+        // Get or create entry
+        let ticker = self.tickers.entry(update.symbol).or_insert_with(|| TickerData {
+            symbol: update.symbol,
+            bid_price: FixedPoint8::ZERO,
+            ask_price: FixedPoint8::ZERO,
+            bid_qty: FixedPoint8::ZERO,
+            ask_qty: FixedPoint8::ZERO,
+            timestamp: 0,
+        });
+        
+        // Update fields
+        if let Some(p) = update.bid_price { ticker.bid_price = p; }
+        if let Some(q) = update.bid_qty { ticker.bid_qty = q; }
+        if let Some(p) = update.ask_price { ticker.ask_price = p; }
+        if let Some(q) = update.ask_qty { ticker.ask_qty = q; }
+        if update.timestamp > ticker.timestamp { ticker.timestamp = update.timestamp; }
+        
+        // Return copy if valid (has prices)
+        if ticker.bid_price.is_positive() && ticker.ask_price.is_positive() {
+            Some(*ticker)
+        } else {
+            None
+        }
     }
 
     /// Connect to Bybit WebSocket
@@ -69,8 +100,6 @@ impl BybitWsClient {
     }
 
     /// Subscribe to public trade stream for symbols
-    /// 
-    /// Bybit V5 uses topics: publicTrade.{symbol}
     pub async fn subscribe_public_trades(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
@@ -89,19 +118,9 @@ impl BybitWsClient {
             .collect();
         
         // Send V5 subscription message
-        let args: Vec<serde_json::Value> = topics
-            .iter()
-            .map(|t| serde_json::json!({"topic": t}))
-            .collect();
-        
-        let args: Vec<serde_json::Value> = topics
-            .iter()
-            .map(|t| serde_json::json!({"topic": t}))
-            .collect();
-        
         let subscribe_msg = serde_json::json!({
             "op": "subscribe",
-            "args": args,
+            "args": topics,
         });
         
         if let Some(conn) = self.connection.as_mut() {
@@ -114,8 +133,6 @@ impl BybitWsClient {
     }
 
     /// Subscribe to ticker stream for symbols
-    /// 
-    /// Bybit V5 uses topics: tickers.{symbol}
     pub async fn subscribe_tickers(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
@@ -131,14 +148,9 @@ impl BybitWsClient {
             })
             .collect();
         
-        let args: Vec<serde_json::Value> = topics
-            .iter()
-            .map(|t| serde_json::json!({"topic": t}))
-            .collect();
-        
         let subscribe_msg = serde_json::json!({
             "op": "subscribe",
-            "args": args,
+            "args": topics,
         });
         
         if let Some(conn) = self.connection.as_mut() {
@@ -151,8 +163,6 @@ impl BybitWsClient {
     }
 
     /// Subscribe to orderbook stream for symbols
-    /// 
-    /// Bybit V5 uses topics: orderbook.1.{symbol} (level 1)
     pub async fn subscribe_orderbook(&mut self, symbols: &[Symbol]) -> Result<()> {
         if symbols.is_empty() {
             return Ok(());
@@ -168,14 +178,9 @@ impl BybitWsClient {
             })
             .collect();
         
-        let args: Vec<serde_json::Value> = topics
-            .iter()
-            .map(|t| serde_json::json!({"topic": t}))
-            .collect();
-        
         let subscribe_msg = serde_json::json!({
             "op": "subscribe",
-            "args": args,
+            "args": topics,
         });
         
         if let Some(conn) = self.connection.as_mut() {
@@ -191,16 +196,28 @@ impl BybitWsClient {
     pub async fn recv(&mut self) -> Result<Option<BybitMessage>> {
         if let Some(conn) = self.connection.as_mut() {
             loop {
-                match conn.recv().await {
-                    Ok(Some(msg)) => {
+                // Send ping if inactive for 20s
+                if self.last_message.elapsed() > Duration::from_secs(20) {
+                    let ping_msg = serde_json::json!({"op": "ping"});
+                    if let Err(e) = conn.send_text(&ping_msg.to_string()).await {
+                        return Err(HftError::WebSocket(e.to_string()));
+                    }
+                    self.last_message = Instant::now(); 
+                }
+
+                // Wait for message with timeout to allow ping check
+                match timeout(Duration::from_secs(5), conn.recv()).await {
+                    Ok(Ok(Some(msg))) => {
                         self.last_message = Instant::now();
                         self.monitor.record_activity();
                         
-                        // Parse message
                         if let Ok(text) = msg.to_text() {
                             match Self::parse_message_static(text) {
                                 Ok(Some(parsed)) => return Ok(Some(parsed)),
-                                Ok(None) => continue, // Unknown/Skip
+                                Ok(None) => {
+                                    tracing::debug!("Ignored Bybit msg: {}", text);
+                                    continue;
+                                },
                                 Err(e) => {
                                     tracing::warn!("Parse error: {}", e);
                                     continue;
@@ -208,13 +225,16 @@ impl BybitWsClient {
                             }
                         }
                     }
-                    Ok(None) => {
-                        // Connection closed
+                    Ok(Ok(None)) => {
                         self.connection = None;
                         return Ok(None);
                     }
-                    Err(e) => {
+                    Ok(Err(e)) => {
                         return Err(HftError::WebSocket(e.to_string()));
+                    }
+                    Err(_) => {
+                        // Timeout, loop again to check ping
+                        continue;
                     }
                 }
             }
@@ -236,8 +256,8 @@ impl BybitWsClient {
                 }
             }
             BybitMessageType::Ticker => {
-                match BybitParser::parse_ticker(data) {
-                    Some(result) => Ok(Some(BybitMessage::Ticker(result.data))),
+                match BybitParser::parse_ticker_update(data) {
+                    Some(result) => Ok(Some(BybitMessage::TickerUpdate(result.data))),
                     None => Ok(None),
                 }
             }
@@ -334,7 +354,16 @@ impl WebSocketExchange for BybitWsClient {
                 Ok(Some(ExchangeMessage::Trade(Exchange::Bybit, trade)))
             }
             Some(BybitMessage::Ticker(ticker)) => {
+                // Should not happen for V5 linear (deltas only), but support it
                 Ok(Some(ExchangeMessage::Ticker(Exchange::Bybit, ticker)))
+            }
+            Some(BybitMessage::TickerUpdate(update)) => {
+                if let Some(ticker) = self.merge_ticker(update) {
+                    Ok(Some(ExchangeMessage::Ticker(Exchange::Bybit, ticker)))
+                } else {
+                    // Update processed but ticker not yet valid/complete
+                    Ok(None)
+                }
             }
             Some(BybitMessage::Pong) | Some(BybitMessage::SubscriptionSuccess) => {
                 Ok(Some(ExchangeMessage::Heartbeat))
@@ -372,8 +401,10 @@ impl WebSocketExchange for BybitWsClient {
 pub enum BybitMessage {
     /// Public trade data
     Trade(TradeData),
-    /// Ticker data
+    /// Ticker data (full snapshot)
     Ticker(TickerData),
+    /// Ticker update (delta)
+    TickerUpdate(BybitTickerUpdate),
     /// Orderbook data
     OrderBook(OrderBookData),
     /// Subscription success response
@@ -416,21 +447,3 @@ mod tests {
         assert_eq!(BybitWsClient::WS_URL_TESTNET, "wss://stream-testnet.bybit.com/v5/public/linear");
     }
 }
-
-// TODO Phase 3.3: Implement zero-copy parsing for Bybit V5 format
-// Bybit V5 format example:
-// {
-//   "topic": "publicTrade.BTCUSDT",
-//   "type": "snapshot",
-//   "ts": 1672304484973,
-//   "data": [
-//     {
-//       "T": 1672304484972,
-//       "s": "BTCUSDT",
-//       "S": "Buy",
-//       "v": "0.001",
-//       "p": "16500.50"
-//     }
-//   ]
-// }
-// Benchmark target: <5μs for JSON → TradeData/TickerData

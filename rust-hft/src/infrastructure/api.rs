@@ -58,8 +58,8 @@ pub async fn start_server(
     let state = AppState { tracker };
 
     // Static files service (from reference/frontend)
-    // In production, this path should be configurable or embedded
-    let static_files = ServeDir::new("reference/frontend");
+    // Using absolute path to ensure it works from any CWD
+    let static_files = ServeDir::new("/root/arbitrageR/reference/frontend");
 
     let app = Router::new()
         // API Endpoints

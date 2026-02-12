@@ -3,7 +3,16 @@
 //! Symbols are stored as u32 IDs with a static lookup table.
 //! Zero-allocation parsing from JSON byte slices.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::LazyLock;
+use std::sync::Mutex;
+
+// Global storage for dynamic symbol names
+static DYNAMIC_SYMBOLS: LazyLock<Mutex<HashMap<Vec<u8>, u32>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Trading pair symbol (interned)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,9 +85,9 @@ impl Symbol {
 
     /// Register new dynamic symbol (warm path, not hot)
     fn register_dynamic(bytes: &[u8]) -> Option<Self> {
-        use std::sync::Mutex;
         use std::collections::HashMap;
         use std::sync::LazyLock;
+        use std::sync::Mutex;
 
         static DYNAMIC_SYMBOLS: LazyLock<Mutex<HashMap<Vec<u8>, u32>>> =
             LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -100,14 +109,45 @@ impl Symbol {
         }
 
         symbols.insert(bytes.to_vec(), id);
+
+        // Store the name for as_str() lookup
+        if let Ok(s) = std::str::from_utf8(bytes) {
+            tracing::debug!("Registering dynamic symbol: {}", s);
+            Self::store_dynamic_name(id, s);
+        }
+
         Some(Symbol(id))
     }
 
     /// Lookup dynamic symbol name
     fn lookup_dynamic_name(id: u32) -> Option<&'static str> {
-        // For now, dynamic symbols just return UNKNOWN
-        // In production, you'd store names in a separate static table
-        None
+        use std::collections::HashMap;
+        use std::sync::LazyLock;
+        use std::sync::Mutex;
+
+        static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
+            LazyLock::new(|| Mutex::new(HashMap::new()));
+
+        DYNAMIC_NAMES
+            .lock()
+            .ok()
+            .and_then(|names| names.get(&id).copied())
+    }
+
+    /// Store name for dynamic symbol
+    fn store_dynamic_name(id: u32, name: &str) {
+        use std::collections::HashMap;
+        use std::sync::LazyLock;
+        use std::sync::Mutex;
+
+        static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
+            LazyLock::new(|| Mutex::new(HashMap::new()));
+
+        if let Ok(mut names) = DYNAMIC_NAMES.lock() {
+            // Leak the string to get a 'static lifetime
+            let leaked: &'static str = Box::leak(name.to_string().into_boxed_str());
+            names.insert(id, leaked);
+        }
     }
 
     // === Pre-defined common symbols ===
