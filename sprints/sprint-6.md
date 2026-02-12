@@ -125,7 +125,7 @@
 |-------|--------|--------|
 | 6.1 | COMPLETE | 668a02b |
 | 6.2 | COMPLETE | 3a85a5a |
-| 6.3 | PENDING | - |
+| 6.3 | COMPLETE | ad5fd70 |
 | 6.4 | PENDING | - |
 | 6.5 | PENDING | - |
 
