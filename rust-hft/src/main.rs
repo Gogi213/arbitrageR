@@ -66,13 +66,17 @@ impl HftApp {
         engine.add_exchange(ExchangeClient::Bybit(BybitWsClient::new()));
         
         // 4. Discover liquid symbols dynamically (Cold Path - startup only)
+        println!("DEBUG: Starting discovery...");
         tracing::info!("Discovering liquid symbols from exchanges...");
         
         let symbols = if !SymbolRegistry::is_initialized() {
             // Step 1: Fetch symbol names only (without parsing)
+            println!("DEBUG: Registry not initialized, creating discovery...");
             let discovery = SymbolDiscovery::new();
+            println!("DEBUG: Fetching symbol names...");
             match discovery.fetch_symbol_names().await {
                 Ok(names) => {
+                    println!("DEBUG: Fetched {} symbol names", names.len());
                     tracing::info!("Fetched {} symbol names", names.len());
                     
                     // Step 2: Register symbols in global registry
