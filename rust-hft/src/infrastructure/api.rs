@@ -18,10 +18,15 @@ use tower_http::services::ServeDir;
 use crate::hot_path::{ScreenerStats, ThresholdTracker};
 use crate::HftError;
 
-/// Shared application state
-#[derive(Clone)]
-pub struct AppState {
-    pub tracker: Arc<RwLock<ThresholdTracker>>,
+/// System status information
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemStatusDto {
+    pub is_connected: bool,
+    pub latency_ms: u64,
+    pub active_symbols: usize,
+    pub binance_connected: bool,
+    pub bybit_connected: bool,
 }
 
 /// DTO for screener stats (matches store.js expectation)
@@ -34,6 +39,14 @@ pub struct ScreenerDto {
     pub hits: u64,
     pub est_half_life: f64,
     pub is_spread_na: bool,
+}
+
+/// Dashboard response DTO - combines system status and screener data
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardDto {
+    pub system: SystemStatusDto,
+    pub screeners: Vec<ScreenerDto>,
 }
 
 impl From<ScreenerStats> for ScreenerDto {
@@ -49,6 +62,12 @@ impl From<ScreenerStats> for ScreenerDto {
     }
 }
 
+/// Shared application state
+#[derive(Clone)]
+pub struct AppState {
+    pub tracker: Arc<RwLock<ThresholdTracker>>,
+}
+
 /// Start the API server
 pub async fn start_server(
     tracker: Arc<RwLock<ThresholdTracker>>,
@@ -57,13 +76,13 @@ pub async fn start_server(
     let state = AppState { tracker };
 
     // Static files service (from reference/frontend)
-    // Using absolute path to ensure it works from any CWD
+    // TODO: Use config for static path (Phase 6.5)
     let static_files = ServeDir::new("/root/arbitrageR/reference/frontend");
 
     let app = Router::new()
         // API Endpoints
+        .route("/api/dashboard/stats", get(get_dashboard_stats))
         .route("/api/screener/stats", get(get_screener_stats))
-        .route("/api/paper/stats", get(get_paper_stats)) // Stub for store.js compatibility
         
         // Static files fallback
         .fallback_service(static_files)
@@ -84,7 +103,37 @@ pub async fn start_server(
     Ok(())
 }
 
+/// Handler for /api/dashboard/stats
+/// Returns combined system status and screener data
+async fn get_dashboard_stats(
+    State(state): State<AppState>
+) -> Json<DashboardDto> {
+    let tracker = state.tracker.read().await;
+    let stats = tracker.get_all_stats();
+    let active_symbols = stats.len();
+    
+    let screeners: Vec<ScreenerDto> = stats
+        .into_iter()
+        .map(ScreenerDto::from)
+        .collect();
+    
+    // TODO: Get actual connection status from AppEngine (Phase 6.2)
+    let system = SystemStatusDto {
+        is_connected: active_symbols > 0,
+        latency_ms: 0, // TODO: Track latency
+        active_symbols,
+        binance_connected: active_symbols > 0, // TODO: Actual status
+        bybit_connected: active_symbols > 0,   // TODO: Actual status
+    };
+    
+    Json(DashboardDto {
+        system,
+        screeners,
+    })
+}
+
 /// Handler for /api/screener/stats
+/// Returns screener data only (backward compatibility)
 async fn get_screener_stats(
     State(state): State<AppState>
 ) -> Json<Vec<ScreenerDto>> {
@@ -97,9 +146,4 @@ async fn get_screener_stats(
         .collect();
         
     Json(dtos)
-}
-
-/// Stub handler for /api/paper/stats (to prevent store.js errors)
-async fn get_paper_stats() -> Json<Vec<()>> {
-    Json(vec![]) // Empty bots list
 }

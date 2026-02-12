@@ -4,8 +4,8 @@ export default {
         <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr); grid-template-rows: auto 1fr; gap: 10px; height: 100%; overflow: hidden; padding-bottom: 10px; box-sizing: border-box;">
             <!-- Row 1: Compact Metrics -->
             <div class="dash-card" style="padding: 10px; margin: 0;">
-                <div class="dash-label" style="margin-bottom:4px;">ACTIVE BOTS</div>
-                <div class="dash-value text-primary" style="font-size:20px;">{{ store.activeBotCount }} <span style="font-size:12px; color:#666;">/ {{ store.bots.length }}</span></div>
+                <div class="dash-label" style="margin-bottom:4px;">ACTIVE SYMBOLS</div>
+                <div class="dash-value text-primary" style="font-size:20px;">{{ store.system.activeSymbols }}</div>
             </div>
             
             <div class="dash-card" style="padding: 10px; margin: 0;">
@@ -14,8 +14,8 @@ export default {
             </div>
             
              <div class="dash-card" style="padding: 10px; margin: 0;">
-                <div class="dash-label" style="margin-bottom:4px;">GLOBAL EXPOSURE</div>
-                <div class="dash-value text-blue" style="font-size:20px;">{{ fmtMoney(globalExposure) }}</div>
+                <div class="dash-label" style="margin-bottom:4px;">LATENCY</div>
+                <div class="dash-value text-blue" style="font-size:20px;">{{ store.system.latencyMs }}ms</div>
             </div>
 
             <!-- Row 2: Screener Table (Full Height) -->
@@ -54,18 +54,9 @@ export default {
         </div>
     `,
     computed: {
-        globalExposure() {
-            return this.store.bots.reduce((sum, b) => sum + Math.abs((b.pos?.q || 0) * (b.tracker?.entryPrice || 0)), 0);
-        },
-        longExposure() {
-            return this.store.bots.filter(b => b.pos?.s === 'LONG').reduce((sum, b) => sum + (b.pos?.q || 0) * (b.tracker?.entryPrice || 0), 0);
-        },
-        shortExposure() {
-             return this.store.bots.filter(b => b.pos?.s === 'SELL').reduce((sum, b) => sum + (b.pos?.q || 0) * (b.tracker?.entryPrice || 0), 0);
-        }
+        // Metrics now come from store.system
     },
     methods: {
-        fmtMoney(v) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v || 0); },
         fmtPct(v) { 
             return new Intl.NumberFormat('en-US', { 
                 style: 'percent', 
