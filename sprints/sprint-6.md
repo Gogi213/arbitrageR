@@ -123,7 +123,7 @@
 
 | Phase | Status | Commit |
 |-------|--------|--------|
-| 6.1 | PENDING | - |
+| 6.1 | COMPLETE | 668a02b |
 | 6.2 | PENDING | - |
 | 6.3 | PENDING | - |
 | 6.4 | PENDING | - |
