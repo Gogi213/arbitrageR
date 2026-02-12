@@ -15,7 +15,7 @@ use rust_hft::hot_path::ThresholdTracker;
 use rust_hft::infrastructure::start_server;
 use rust_hft::engine::AppEngine;
 use rust_hft::exchanges::{BinanceWsClient, BybitWsClient, ExchangeClient};
-use rust_hft::core::Symbol;
+use rust_hft::core::{Symbol, SymbolDiscovery};
 use rust_hft::Result;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -65,20 +65,30 @@ impl HftApp {
         engine.add_exchange(ExchangeClient::Binance(BinanceWsClient::new()));
         engine.add_exchange(ExchangeClient::Bybit(BybitWsClient::new()));
         
-        // Define symbols to track
-        let symbols = vec![
-            Symbol::BTCUSDT,
-            Symbol::ETHUSDT,
-            Symbol::SOLUSDT,
-            Symbol::BNBUSDT,
-            Symbol::XRPUSDT,
-            Symbol::ADAUSDT,
-            Symbol::DOGEUSDT,
-            Symbol::AVAXUSDT,
-            Symbol::TRXUSDT,
-            Symbol::DOTUSDT,
-            Symbol::PEPEUSDT,
-        ];
+        // 4. Discover liquid symbols dynamically (Cold Path - startup only)
+        tracing::info!("Discovering liquid symbols from exchanges...");
+        let discovery = SymbolDiscovery::new();
+        
+        let symbols = match discovery.fetch_all_liquid().await {
+            Ok(discovered) => {
+                let symbols: Vec<Symbol> = discovered.into_iter()
+                    .map(|d| d.symbol)
+                    .collect();
+                tracing::info!("Discovered {} liquid symbols", symbols.len());
+                symbols
+            }
+            Err(e) => {
+                tracing::warn!("Failed to discover symbols: {}. Using fallback.", e);
+                // Fallback to major pairs if discovery fails
+                vec![
+                    Symbol::BTCUSDT,
+                    Symbol::ETHUSDT,
+                    Symbol::SOLUSDT,
+                    Symbol::BNBUSDT,
+                    Symbol::XRPUSDT,
+                ]
+            }
+        };
         
         // Run engine (this blocks the task)
         engine.run(&symbols).await?;
