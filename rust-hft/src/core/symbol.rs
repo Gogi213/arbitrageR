@@ -1,18 +1,15 @@
 //! Symbol interning for zero-allocation string handling
 //!
-//! Symbols are stored as u32 IDs with a static lookup table.
+//! Symbols are stored as u32 IDs with pre-registered lookup.
 //! Zero-allocation parsing from JSON byte slices.
+//!
+//! Architecture:
+//! - IDs 0-10: Pre-defined constants (BTCUSDT, ETHUSDT, etc.)
+//! - IDs 11+: Dynamically registered at startup via SymbolRegistry
+//!
+//! Hot Path: from_bytes() does O(1) lookup, no locks, no allocation
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::LazyLock;
-use std::sync::Mutex;
-
-// Global storage for dynamic symbol names
-static DYNAMIC_SYMBOLS: LazyLock<Mutex<HashMap<Vec<u8>, u32>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Trading pair symbol (interned)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -21,7 +18,10 @@ pub struct Symbol(u32);
 
 impl Symbol {
     /// Maximum number of symbols supported
-    pub const MAX_SYMBOLS: u32 = 10_000;
+    pub const MAX_SYMBOLS: u32 = 5000;
+
+    /// Unknown symbol (returned when not found)
+    pub const UNKNOWN: Self = Self(u32::MAX);
 
     /// Create from raw u32 ID
     #[inline(always)]
@@ -35,16 +35,18 @@ impl Symbol {
         self.0
     }
 
-    /// Parse from byte slice (e.g., from JSON)
-    /// Uses perfect hash for static symbols, falls back to dynamic
+    /// Parse from byte slice (hot path, lock-free)
+    ///
+    /// Returns Symbol::UNKNOWN if not registered.
+    /// Use SymbolRegistry::initialize() at startup to register symbols.
     #[inline]
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        // Reject empty strings
         if bytes.is_empty() {
             return None;
         }
 
-        // Fast path: check common symbols with direct comparison
+        // Fast path: check pre-defined symbols with direct comparison
+        // These are branch-predictable and avoid hash computation
         match bytes {
             b"BTCUSDT" => return Some(Symbol::BTCUSDT),
             b"ETHUSDT" => return Some(Symbol::ETHUSDT),
@@ -60,13 +62,21 @@ impl Symbol {
             _ => {}
         }
 
-        // Slow path: try to register new symbol
-        Self::register_dynamic(bytes)
+        // Lookup in registry (if initialized)
+        // This is still O(1) hash lookup, no locks
+        if let Some(registry) = crate::core::registry::SymbolRegistry::try_global() {
+            return registry.lookup(bytes);
+        }
+
+        // Fallback: registry not initialized, return None
+        // In production, this should not happen after startup
+        None
     }
 
-    /// Convert symbol back to string
+    /// Convert symbol back to string (hot path)
     #[inline]
     pub fn as_str(&self) -> &'static str {
+        // Fast path: pre-defined symbols
         match self.0 {
             0 => "BTCUSDT",
             1 => "ETHUSDT",
@@ -79,78 +89,25 @@ impl Symbol {
             8 => "TRXUSDT",
             9 => "DOTUSDT",
             10 => "PEPEUSDT",
-            _ => Self::lookup_dynamic_name(self.0).unwrap_or("UNKNOWN"),
+            _ => {
+                // Lookup in registry
+                if let Some(registry) = crate::core::registry::SymbolRegistry::try_global() {
+                    if let Some(name) = registry.get_name(*self) {
+                        return name;
+                    }
+                }
+                "UNKNOWN"
+            }
         }
     }
 
-    /// Register new dynamic symbol (warm path, not hot)
-    fn register_dynamic(bytes: &[u8]) -> Option<Self> {
-        use std::collections::HashMap;
-        use std::sync::LazyLock;
-        use std::sync::Mutex;
-
-        static DYNAMIC_SYMBOLS: LazyLock<Mutex<HashMap<Vec<u8>, u32>>> =
-            LazyLock::new(|| Mutex::new(HashMap::new()));
-        static NEXT_ID: AtomicU32 = AtomicU32::new(STATIC_SYMBOL_COUNT as u32);
-
-        // Try to get existing
-        let symbols = DYNAMIC_SYMBOLS.lock().ok()?;
-        if let Some(&id) = symbols.get(bytes) {
-            return Some(Symbol(id));
-        }
-        drop(symbols);
-
-        // Register new
-        let mut symbols = DYNAMIC_SYMBOLS.lock().ok()?;
-        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-
-        if id >= Symbol::MAX_SYMBOLS {
-            return None; // Table full
-        }
-
-        symbols.insert(bytes.to_vec(), id);
-
-        // Store the name for as_str() lookup
-        if let Ok(s) = std::str::from_utf8(bytes) {
-            tracing::debug!("Registering dynamic symbol: {}", s);
-            Self::store_dynamic_name(id, s);
-        }
-
-        Some(Symbol(id))
+    /// Check if this is a valid symbol (not UNKNOWN)
+    #[inline(always)]
+    pub const fn is_valid(&self) -> bool {
+        self.0 != Self::UNKNOWN.0
     }
 
-    /// Lookup dynamic symbol name
-    fn lookup_dynamic_name(id: u32) -> Option<&'static str> {
-        use std::collections::HashMap;
-        use std::sync::LazyLock;
-        use std::sync::Mutex;
-
-        static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
-            LazyLock::new(|| Mutex::new(HashMap::new()));
-
-        DYNAMIC_NAMES
-            .lock()
-            .ok()
-            .and_then(|names| names.get(&id).copied())
-    }
-
-    /// Store name for dynamic symbol
-    fn store_dynamic_name(id: u32, name: &str) {
-        use std::collections::HashMap;
-        use std::sync::LazyLock;
-        use std::sync::Mutex;
-
-        static DYNAMIC_NAMES: LazyLock<Mutex<HashMap<u32, &'static str>>> =
-            LazyLock::new(|| Mutex::new(HashMap::new()));
-
-        if let Ok(mut names) = DYNAMIC_NAMES.lock() {
-            // Leak the string to get a 'static lifetime
-            let leaked: &'static str = Box::leak(name.to_string().into_boxed_str());
-            names.insert(id, leaked);
-        }
-    }
-
-    // === Pre-defined common symbols ===
+    // === Pre-defined common symbols (IDs 0-10) ===
     pub const BTCUSDT: Self = Self(0);
     pub const ETHUSDT: Self = Self(1);
     pub const SOLUSDT: Self = Self(2);
@@ -170,8 +127,6 @@ impl Default for Symbol {
         Self(0)
     }
 }
-
-const STATIC_SYMBOL_COUNT: u32 = 11;
 
 #[cfg(test)]
 mod tests {
@@ -194,16 +149,7 @@ mod tests {
 
     #[test]
     fn test_invalid_symbol() {
-        // Empty string should return None
         assert!(Symbol::from_bytes(b"").is_none());
-
-        // Unknown symbols get registered dynamically (not invalid, just new)
-        let new_sym = Symbol::from_bytes(b"NEWCOINUSDT");
-        assert!(new_sym.is_some());
-
-        // Should get same ID on second lookup
-        let new_sym2 = Symbol::from_bytes(b"NEWCOINUSDT");
-        assert_eq!(new_sym, new_sym2);
     }
 
     #[test]
@@ -230,8 +176,8 @@ mod tests {
     #[test]
     fn test_symbol_copy() {
         let a = Symbol::BTCUSDT;
-        let b = a; // Copy, not move
-        let c = a; // Can still use a
+        let b = a;
+        let c = a;
 
         assert_eq!(a, b);
         assert_eq!(a, c);
@@ -245,20 +191,19 @@ mod tests {
     }
 
     #[test]
-    fn test_dynamic_symbol() {
-        // Register a new dynamic symbol
-        let sym = Symbol::from_bytes(b"PEPEUSDT");
-        assert!(sym.is_some());
-
-        // Should return the same ID
-        let sym2 = Symbol::from_bytes(b"PEPEUSDT");
-        assert_eq!(sym, sym2);
+    fn test_unknown_symbol() {
+        assert!(!Symbol::UNKNOWN.is_valid());
+        assert!(Symbol::BTCUSDT.is_valid());
     }
 }
 
+// Number of pre-defined static symbols (IDs 0-10)
+const STATIC_SYMBOL_COUNT: u32 = 11;
+
 // HFT Hot Path Checklist verified:
-// ✓ No heap allocations in hot path (static lookup only)
+// ✓ No heap allocations (all stack-based)
 // ✓ No panics (all operations return Option)
+// ✓ No locks in hot path (registry lookup is read-only)
 // ✓ Stack only (Copy type)
-// ✓ O(1) lookup via pattern matching
+// ✓ O(1) lookup via pattern matching + hash
 // ✓ No string operations in hot path
