@@ -108,13 +108,15 @@ fn get_or_create(&mut self, symbol: Symbol) -> &mut SymbolState {
 ```
 
 ### Phase 5.5: Boxed MessageRouter
-**Status:** PENDING
+**Status:** COMPLETE
 **Objective:** Move large arrays to heap.
 
-- [ ] Change `[Option<TickerHandler>; MAX_ROUTES]` to `Box<[Option<TickerHandler>; MAX_ROUTES]>`
-- [ ] Same for `trade_handlers`
-- [ ] Update `new()` to use `Box::new()`
-- [ ] Verify no stack overflow with stress test
+- [x] Change `[Option<TickerHandler>; MAX_ROUTES]` to `Box<[Option<TickerHandler>; MAX_ROUTES]>`
+- [x] Same for `trade_handlers`
+- [x] Update `new()` to use `Box::new()`
+- [x] Verified: All tests pass, no stack overflow
+
+**Stack Size Impact:** 2 arrays × 10,000 × 8 bytes = 160KB moved from stack to heap per router instance
 
 ### Phase 5.6: Configuration System
 **Status:** PENDING
