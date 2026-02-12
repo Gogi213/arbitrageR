@@ -57,7 +57,7 @@ store.fetchStats = async function() {
         store.system.lastUpdate = Date.now();
         
         // Update Screener Data
-        store.screener = data.screeners || [];
+        store.screener = data.screener || [];
         
         // Record History (Max 300 points) - Approx 1Hz
         if (Date.now() % 1000 < 500) {

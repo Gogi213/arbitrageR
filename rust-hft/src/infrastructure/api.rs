@@ -46,7 +46,7 @@ pub struct ScreenerDto {
 #[serde(rename_all = "camelCase")]
 pub struct DashboardDto {
     pub system: SystemStatusDto,
-    pub screeners: Vec<ScreenerDto>,
+    pub screener: Vec<ScreenerDto>,
 }
 
 impl From<ScreenerStats> for ScreenerDto {
@@ -128,7 +128,7 @@ async fn get_dashboard_stats(
     
     Json(DashboardDto {
         system,
-        screeners,
+        screener: screeners,
     })
 }
 
