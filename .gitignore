@@ -19,6 +19,7 @@ rust-hft/Cargo.lock
 # Logs
 /logs
 *.log
+rust-hft/logs/
 
 # Data files
 /data
